@@ -1,11 +1,89 @@
-<div align="center">
+# Health Context Android
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+`health-context-android` is the Android companion for the Health Context
+system. It reads a broad set of relevant Health Connect records and shows
+whether each daily domain is available. Its purpose is to make missing
+data visible before it is used in a health conversation; it is not a medical
+app or a cloud sync service.
 
-  <h1>Built with AI Studio</h2>
+The companion repository,
+[`health-context-pipeline`](https://github.com/saski/health-context-pipeline),
+defines the cross-platform tracking outcome, the daily-context contract, and
+the path by which an explicitly enabled summary can be used in ChatGPT Health.
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## What the app reads
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+After you grant the corresponding Health Connect permissions, the app groups
+today's or yesterday's information into six compact domains:
 
-</div>
+- daily activity: steps, active and total calories, distance, elevation,
+  floors and cadence;
+- workouts: every exercise session plus available speed, power and cycling
+  cadence summaries;
+- sleep: every session and its duration;
+- body: weight, body fat, water, bone and lean mass, height and basal metabolism;
+- nutrition: distinct food entries, populated nutrient totals and hydration;
+- indicators: heart rate, resting heart rate, HRV, oxygen saturation,
+  respiratory rate, VO2 max, blood pressure, blood glucose and temperature.
+
+It reports a domain as available, partial, unavailable, or requiring
+permission. No record is treated as zero, and a missing manual nutrition entry
+remains an explicit gap rather than an error.
+
+## Privacy boundary
+
+The app reads Health Connect in the foreground when opened. If you explicitly
+enable daily synchronization, it also requests background-read access for the
+same summary domains and exports the previous day in a flexible morning
+window. It requests full history access when the installed provider supports
+it so existing trends can be backfilled later. It has no Internet permission,
+does not write Health Connect records, and does not read exercise routes or
+location. It writes only inside the folder selected through Android's system
+picker; it has no OAuth credentials or broad Drive access.
+
+## Use it
+
+1. Install the build from Google AI Studio on an Android device with Health
+   Connect available.
+2. Open **Salud Disponibilidad**.
+3. Tap **Conceder permisos** and approve the listed read permissions. The first
+   update after this coverage expansion asks for more categories once.
+4. The app refreshes when opened; **Actualizar** remains available as recovery.
+5. Under **Exportación diaria a Drive**, tap **Elegir carpeta** and choose the
+   `Health context` folder in Google Drive. Android will remember only that
+   folder until you change it.
+6. Tap **Activar automático** and grant Health Connect background-read access.
+   The app immediately attempts yesterday's export and schedules a daily run
+   around 09:00 local time. Android may defer the exact execution time.
+7. Use **Exportar hoy ahora** or **Exportar ayer ahora** only as a manual
+   recovery path.
+8. Wait for Google Drive to show the file, then start a conversation in the
+   ChatGPT Health project. The app reports a local write only; it does not
+   claim that the project has already read the file.
+
+An unavailable domain can simply mean that the relevant device was not worn,
+has not synchronized, or that no manual entry was made. It is not a diagnosis.
+
+## Development and synchronization
+
+Google AI Studio is the current Android build environment and synchronizes this
+repository on `main`. Let a synchronization finish before editing the same files
+elsewhere; do not create a second repository from AI Studio. For a change made
+locally, commit and push it here, then confirm that AI Studio reports the two
+surfaces as in sync.
+
+The local Android SDK, Android Studio, and ADB are intentionally deferred until
+the simpler browser-build and device-install path no longer meets the need. The
+companion repository documents that decision and the future local setup gate.
+
+## Status
+
+The original five-signal Health Connect read path has been exercised on a
+physical device. Nutrition availability has also been confirmed after a manual
+Zepp entry. Foreground manual export to a user-selected Drive folder has been
+validated end to end: the Android artifact was written to Drive and read by
+ChatGPT Health with provenance and gaps intact. Opt-in automatic previous-day
+export is implemented and awaits physical-device validation. Comprehensive
+coverage, including exercise sessions, compiles and passes the unit suite in
+GitHub CI. It now awaits a physical-device check against a Fit workout after
+the expanded read permissions are granted.

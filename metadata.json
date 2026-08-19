@@ -1,0 +1,7 @@
+{
+  "name": "Health availability",
+  "description": "Local Health Connect availability inspector with Spanish labels and strict data boundaries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

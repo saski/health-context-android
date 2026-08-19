@@ -1,0 +1,52 @@
+<resources>
+    <string name="app_name">Health availability</string>
+    <string name="app_title">Disponibilidad de Salud</string>
+    <string name="connect_health_connect">Conectar Health Connect</string>
+    <string name="check_availability">Comprobar disponibilidad</string>
+    <string name="refresh">Actualizar</string>
+    <string name="refreshing">Actualizando…</string>
+    <string name="today">Hoy</string>
+    <string name="yesterday">Ayer</string>
+    <string name="timezone_label">Zona horaria: %1$s</string>
+    <string name="last_refreshed">Última actualización: %1$s</string>
+    <string name="never_refreshed">Sin actualizar aún</string>
+    
+    <!-- Status labels -->
+    <string name="status_available">Disponible</string>
+    <string name="status_partial">Parcial</string>
+    <string name="status_unavailable">No disponible</string>
+    <string name="status_permission_needed">Permiso requerido</string>
+    
+    <!-- Overall summary -->
+    <string name="overall_complete">Estado general: Completo</string>
+    <string name="overall_partial">Estado general: Parcial</string>
+    <string name="missing_domains_label">Dominios no disponibles:</string>
+    
+    <!-- Domains -->
+    <string name="domain_steps">Actividad diaria</string>
+    <string name="domain_exercise">Entrenamientos</string>
+    <string name="domain_sleep">Sueño</string>
+    <string name="domain_weight">Cuerpo</string>
+    <string name="domain_nutrition">Nutrición</string>
+    <string name="domain_resting_hr">Indicadores</string>
+    
+    <!-- Card details -->
+    <string name="source_label">Fuente: %1$s</string>
+    <string name="source_not_available">Fuente no disponible en esta lectura</string>
+    <string name="coverage_label">Cobertura: %1$s</string>
+    <string name="no_usable_record">Sin registro utilizable</string>
+    <string name="reason_label">Motivo: %1$s</string>
+    
+    <!-- Health Connect Status Explanations -->
+    <string name="hc_available">Health Connect está instalado y disponible en este dispositivo.</string>
+    <string name="hc_update_required">Health Connect requiere una actualización. Abre Google Play Store para actualizarlo.</string>
+    <string name="hc_unavailable">Health Connect no está instalado o no es compatible con este dispositivo.</string>
+    <string name="open_play_store">Abrir Google Play Store</string>
+    <string name="grant_permissions">Conceder permisos</string>
+    <string name="manage_permissions">Gestionar permisos</string>
+    
+    <!-- Data boundaries screen -->
+    <string name="data_boundaries_title">Límites de datos y privacidad</string>
+    <string name="data_boundaries_statement">Lee actividad, entrenamientos, sueño, cuerpo, nutrición e indicadores de Health Connect. Con sincronización diaria los resume en segundo plano y escribe ayer únicamente en la carpeta elegida. Sin permiso de Internet propio, OAuth, rutas GPS ni escritura en Health Connect.</string>
+    <string name="close">Cerrar</string>
+</resources>

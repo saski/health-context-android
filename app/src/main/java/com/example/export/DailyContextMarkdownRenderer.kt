@@ -1,0 +1,45 @@
+package com.example.export
+
+import com.example.data.model.DayAvailabilityReport
+import com.example.data.model.HealthAvailabilityStatus
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+
+object DailyContextMarkdownRenderer {
+    fun fileName(report: DayAvailabilityReport): String = "health-context-${report.date}.md"
+
+    fun render(report: DayAvailabilityReport, generatedAt: Instant): String = buildString {
+        appendLine("# Health context — ${report.date}")
+        appendLine()
+        appendLine("- schema: health-context/v2")
+        appendLine("- generated_at: ${DateTimeFormatter.ISO_INSTANT.format(generatedAt)}")
+        appendLine("- timezone: ${report.zoneId.id}")
+        appendLine("- overall_status: ${report.overallStatus.name.lowercase()}")
+        appendLine("- snapshot: daily Health Connect read; generated in foreground or scheduled background; not a live feed")
+        report.domains.forEach { domain ->
+            appendLine()
+            appendLine("## ${domain.domain.labelEs}")
+            appendLine("- status: ${domain.status.name.lowercase()}")
+            appendLine("- source: ${domain.source}")
+            appendLine("- coverage: ${domain.coveredThrough}")
+            appendLine("- reason: ${domain.reason}")
+            domain.metricSummary?.let { appendLine("- observation: $it") }
+            if (domain.status != HealthAvailabilityStatus.AVAILABLE) {
+                appendLine("- gap: unavailable; no value is inferred as zero")
+            }
+            domain.metrics.forEach { metric ->
+                appendLine()
+                appendLine("### ${metric.label}")
+                appendLine("- key: ${metric.key}")
+                appendLine("- status: ${metric.status.name.lowercase()}")
+                appendLine("- source: ${metric.source}")
+                appendLine("- coverage: ${metric.coveredThrough}")
+                appendLine("- reason: ${metric.reason}")
+                metric.observation?.let { appendLine("- observation: $it") }
+                if (metric.status != HealthAvailabilityStatus.AVAILABLE) {
+                    appendLine("- gap: unavailable; no value is inferred as zero")
+                }
+            }
+        }
+    }
+}
