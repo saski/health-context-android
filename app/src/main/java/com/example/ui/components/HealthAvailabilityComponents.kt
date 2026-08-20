@@ -44,7 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -60,14 +59,17 @@ import com.example.data.model.DomainAvailability
 import com.example.data.model.HealthAvailabilityStatus
 import com.example.data.model.HealthDomain
 import com.example.data.model.HealthStatusMapper
+import com.example.data.model.MetricAvailability
 import com.example.data.model.SdkAvailability
 import com.example.ui.theme.CleanContainer
 import com.example.ui.theme.CleanPrimary
 import com.example.ui.theme.CleanPrimaryContainer
 import com.example.ui.theme.CleanStatusAvailableBg
+import com.example.ui.theme.CleanStatusAvailableBorder
 import com.example.ui.theme.CleanStatusAvailableText
 import com.example.ui.theme.CleanStatusPartialAccent
 import com.example.ui.theme.CleanStatusPartialBg
+import com.example.ui.theme.CleanStatusPartialBorder
 import com.example.ui.theme.CleanStatusPartialText
 import com.example.ui.theme.CleanStatusPermissionBg
 import com.example.ui.theme.CleanStatusPermissionBorder
@@ -75,6 +77,7 @@ import com.example.ui.theme.CleanStatusPermissionTagBg
 import com.example.ui.theme.CleanStatusPermissionTagText
 import com.example.ui.theme.CleanStatusPermissionText
 import com.example.ui.theme.CleanStatusUnavailableBg
+import com.example.ui.theme.CleanStatusUnavailableBorder
 import com.example.ui.theme.CleanStatusUnavailableText
 import com.example.ui.theme.CleanSurface
 import com.example.ui.theme.CleanSurfaceBorder
@@ -292,6 +295,7 @@ fun OverallStatusCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HealthDomainCard(
     availability: DomainAvailability,
@@ -306,34 +310,30 @@ fun HealthDomainCard(
         HealthDomain.RESTING_HEART_RATE -> Icons.Filled.Favorite
     }
 
-    val (iconBg, iconTint, cardBg, cardBorder, isDimmed) = when (availability.status) {
-        HealthAvailabilityStatus.AVAILABLE -> Quint(
+    val (iconBg, iconTint, cardBg, cardBorder) = when (availability.status) {
+        HealthAvailabilityStatus.AVAILABLE -> Quad(
             CleanPrimaryContainer,
             CleanStatusAvailableText,
             CleanSurface,
-            CleanSurfaceBorder,
-            false
+            CleanStatusAvailableBorder
         )
-        HealthAvailabilityStatus.UNAVAILABLE -> Quint(
+        HealthAvailabilityStatus.UNAVAILABLE -> Quad(
             CleanStatusUnavailableBg,
             CleanStatusUnavailableText,
             CleanSurface,
-            CleanSurfaceBorder,
-            true
+            CleanStatusUnavailableBorder
         )
-        HealthAvailabilityStatus.PERMISSION_NEEDED -> Quint(
+        HealthAvailabilityStatus.PERMISSION_NEEDED -> Quad(
             CleanStatusPermissionBorder,
             CleanStatusPermissionText,
             CleanStatusPermissionBg,
-            CleanStatusPermissionBorder,
-            false
+            CleanStatusPermissionBorder
         )
-        HealthAvailabilityStatus.PARTIAL -> Quint(
+        HealthAvailabilityStatus.PARTIAL -> Quad(
             CleanPrimaryContainer,
-            CleanStatusAvailableText,
+            CleanPrimary,
             CleanSurface,
-            CleanSurfaceBorder,
-            false
+            CleanStatusPartialBorder
         )
     }
 
@@ -341,102 +341,181 @@ fun HealthDomainCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .alpha(if (isDimmed) 0.65f else 1.0f)
             .testTag("domain_card_${availability.domain.name.lowercase()}"),
         color = cardBg,
         border = BorderStroke(1.dp, cardBorder)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Icon Square
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(iconBg),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(20.dp)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(iconBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = availability.domain.labelEs,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (availability.status == HealthAvailabilityStatus.PERMISSION_NEEDED) {
+                        CleanStatusPermissionText
+                    } else {
+                        CleanTextPrimary
+                    },
+                    modifier = Modifier.weight(1f)
                 )
+                StatusBadge(status = availability.status)
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Details Column
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                // Top Row: Domain Title + Status Tag
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = availability.domain.labelEs,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (availability.status == HealthAvailabilityStatus.PERMISSION_NEEDED) CleanStatusPermissionText else CleanTextPrimary
-                    )
-                    StatusBadge(status = availability.status)
+            if (availability.metrics.isNotEmpty()) {
+                val observedMetrics = availability.metrics.filter {
+                    it.status == HealthAvailabilityStatus.AVAILABLE
+                }
+                val unavailableMetrics = availability.metrics.filter {
+                    it.status == HealthAvailabilityStatus.UNAVAILABLE
+                }
+                val permissionMetrics = availability.metrics.filter {
+                    it.status == HealthAvailabilityStatus.PERMISSION_NEEDED
                 }
 
-                // Row 1: Metric summary / source
-                val primaryLine = buildString {
-                    if (!availability.metricSummary.isNullOrBlank()) {
-                        append(availability.metricSummary)
-                        if (availability.source != HealthStatusMapper.SOURCE_NOT_AVAILABLE) {
-                            append(" • ")
-                            append(availability.source)
-                        }
-                    } else {
-                        append(availability.source)
+                if (observedMetrics.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        observedMetrics.forEach { metric -> ObservedMetricChip(metric) }
                     }
                 }
+                if (unavailableMetrics.isNotEmpty()) {
+                    MetricGapLine(
+                        label = "Sin registro",
+                        metrics = unavailableMetrics,
+                        color = CleanStatusUnavailableText,
+                        dotColor = CleanStatusUnavailableBorder
+                    )
+                }
+                if (permissionMetrics.isNotEmpty()) {
+                    MetricGapLine(
+                        label = "Permiso necesario",
+                        metrics = permissionMetrics,
+                        color = CleanStatusPermissionText,
+                        dotColor = CleanStatusPermissionText
+                    )
+                }
+            } else {
+                val fallback = availability.metricSummary
+                    ?.takeIf { it.isNotBlank() }
+                    ?: availability.reason
                 Text(
-                    text = primaryLine,
-                    fontSize = 11.sp,
-                    color = if (availability.status == HealthAvailabilityStatus.PERMISSION_NEEDED) CleanStatusPermissionText else CleanTextSecondary,
-                    maxLines = 1
-                )
-
-                // Row 2: Coverage / Reason
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = availability.reason,
-                        fontSize = 11.sp,
-                        color = if (availability.status == HealthAvailabilityStatus.UNAVAILABLE) CleanStatusPartialAccent else CleanTextSecondary,
-                        modifier = Modifier.weight(1f, fill = false),
-                        maxLines = 1
-                    )
-                    if (availability.coveredThrough != HealthStatusMapper.NO_USABLE_RECORD) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = availability.coveredThrough,
-                            fontSize = 11.sp,
-                            color = CleanTextSecondary
-                        )
+                    text = fallback,
+                    fontSize = 12.sp,
+                    color = when (availability.status) {
+                        HealthAvailabilityStatus.AVAILABLE -> CleanStatusAvailableText
+                        HealthAvailabilityStatus.PARTIAL -> CleanStatusPartialText
+                        HealthAvailabilityStatus.UNAVAILABLE -> CleanStatusUnavailableText
+                        HealthAvailabilityStatus.PERMISSION_NEEDED -> CleanStatusPermissionText
                     }
+                )
+                if (availability.coveredThrough != HealthStatusMapper.NO_USABLE_RECORD) {
+                    Text(
+                        text = availability.coveredThrough,
+                        fontSize = 11.sp,
+                        color = CleanTextSecondary
+                    )
                 }
             }
         }
     }
 }
 
-private data class Quint<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+@Composable
+private fun ObservedMetricChip(metric: MetricAvailability) {
+    Surface(
+        color = CleanStatusAvailableBg,
+        shape = RoundedCornerShape(9.dp),
+        border = BorderStroke(1.dp, CleanStatusAvailableBorder),
+        modifier = Modifier.testTag("metric_observed_${metric.key}")
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(CleanStatusAvailableText)
+            )
+            Text(text = metric.label, fontSize = 11.sp, color = CleanTextPrimary)
+            metricDisplayValue(metric)?.let { value ->
+                Text(
+                    text = value,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CleanStatusAvailableText
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricGapLine(
+    label: String,
+    metrics: List<MetricAvailability>,
+    color: Color,
+    dotColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 5.dp)
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
+        Text(
+            text = "$label: ${metrics.joinToString(" · ") { it.label }}",
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            color = color,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+private fun metricDisplayValue(metric: MetricAvailability): String? {
+    val observation = metric.observation?.takeIf { it.isNotBlank() } ?: return null
+    val coverage = metric.coveredThrough.takeIf {
+        it.isNotBlank() &&
+            it != HealthStatusMapper.NO_USABLE_RECORD &&
+            it !in setOf("Total del día", "Agregación acumulada del día", "día completo") &&
+            !observation.contains(it)
+    }
+    return if (coverage != null) "$observation · $coverage" else observation
+}
 
 @Composable
 fun DataBoundariesFooterBox(
