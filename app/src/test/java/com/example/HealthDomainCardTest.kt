@@ -1,8 +1,7 @@
 package com.example
 
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import com.example.data.model.DomainAvailability
 import com.example.data.model.HealthAvailabilityStatus
@@ -11,6 +10,7 @@ import com.example.data.model.HealthStatusMapper
 import com.example.data.model.MetricAvailability
 import com.example.ui.components.HealthDomainCard
 import com.example.ui.theme.MyApplicationTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -42,13 +42,13 @@ class HealthDomainCardTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Pasos").assertExists()
-        composeTestRule.onNodeWithText("4.218 pasos").assertExists()
-        composeTestRule.onNodeWithText("Distancia").assertExists()
-        composeTestRule.onNodeWithText("3.2 km").assertExists()
-        composeTestRule.onNodeWithText("Sin registro: Calorías activas · Cadencia media de pasos").assertExists()
-        composeTestRule.onNodeWithText("2 de 4 métricas con datos").assertDoesNotExist()
-        composeTestRule.onNodeWithText("Hay datos y huecos explícitos en este dominio").assertDoesNotExist()
+        assertTextExists("Pasos")
+        assertTextExists("4.218 pasos")
+        assertTextExists("Distancia")
+        assertTextExists("3.2 km")
+        assertTextExists("Sin registro: Calorías activas · Cadencia media de pasos")
+        assertTextDoesNotExist("2 de 4 métricas con datos")
+        assertTextDoesNotExist("Hay datos y huecos explícitos en este dominio")
     }
 
     @Test
@@ -78,8 +78,16 @@ class HealthDomainCardTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Sin registro: Saturación de oxígeno").assertExists()
-        composeTestRule.onNodeWithText("Permiso necesario: Frecuencia cardíaca").assertExists()
+        assertTextExists("Sin registro: Saturación de oxígeno")
+        assertTextExists("Permiso necesario: Frecuencia cardíaca")
+    }
+
+    private fun assertTextExists(text: String) {
+        composeTestRule.onNodeWithText(text).fetchSemanticsNode()
+    }
+
+    private fun assertTextDoesNotExist(text: String) {
+        assertTrue(composeTestRule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty())
     }
 
     private fun metric(key: String, label: String, observation: String) = MetricAvailability(
