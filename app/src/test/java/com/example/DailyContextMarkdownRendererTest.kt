@@ -31,6 +31,10 @@ class DailyContextMarkdownRendererTest {
 
         assertTrue(DailyContextMarkdownRenderer.fileName(report) == "health-context-2026-08-18.md")
         assertTrue(markdown.contains("overall_status: partial"))
+        assertTrue(markdown.contains("## Nightly review"))
+        assertTrue(markdown.contains("### Observed facts"))
+        assertTrue(markdown.contains("### Explicit gaps"))
+        assertTrue(markdown.contains("### Possible next actions"))
         assertTrue(markdown.contains("gap: unavailable; no value is inferred as zero"))
         assertFalse(markdown.contains("sleep: 0"))
     }

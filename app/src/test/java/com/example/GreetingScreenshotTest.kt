@@ -53,6 +53,10 @@ class GreetingScreenshotTest {
           onChooseExportFolder = {},
           onExport = {},
           onToggleAutomaticExport = {},
+          onToggleNightlyReview = {},
+          onGenerateNightlyReviewNow = {},
+          onShowNightlyReview = {},
+          onNightlyReviewFeedback = {},
           zoneId = zoneId
         )
       }

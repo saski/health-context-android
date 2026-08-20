@@ -1,5 +1,7 @@
 package com.example.data.model
 
+import com.example.review.NightlyReview
+import com.example.review.NightlyReviewFeedback
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -89,6 +91,12 @@ data class HealthUiState(
     val backgroundReadPermissionGranted: Boolean = false,
     val automaticExportEnabled: Boolean = false,
     val automaticExportStatus: String? = null,
+    val nightlyReviewEnabled: Boolean = false,
+    val nightlyReviewStatus: String? = null,
+    val latestNightlyReview: NightlyReview? = null,
+    val nightlyReviewFeedback: NightlyReviewFeedback? = null,
+    val isGeneratingNightlyReview: Boolean = false,
+    val showNightlyReview: Boolean = false,
     val showDataBoundaries: Boolean = false,
     val errorMessage: String? = null
 )

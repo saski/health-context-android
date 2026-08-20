@@ -18,11 +18,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,7 +45,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -56,6 +57,8 @@ import com.example.data.model.HealthUiState
 import com.example.data.model.SdkAvailability
 import com.example.data.model.SelectedDayTab
 import com.example.data.repository.FakeHealthConnectRepository
+import com.example.review.NightlyReview
+import com.example.review.NightlyReviewFeedback
 import com.example.ui.components.DataBoundariesDialog
 import com.example.ui.components.DataBoundariesFooterBox
 import com.example.ui.components.HealthDomainCard
@@ -85,9 +88,25 @@ fun HealthAvailabilityScreen(
     onChooseExportFolder: () -> Unit,
     onExport: () -> Unit,
     onToggleAutomaticExport: () -> Unit,
+    onToggleNightlyReview: () -> Unit,
+    onGenerateNightlyReviewNow: () -> Unit,
+    onShowNightlyReview: (Boolean) -> Unit,
+    onNightlyReviewFeedback: (NightlyReviewFeedback) -> Unit,
     zoneId: ZoneId = ZoneId.systemDefault(),
     modifier: Modifier = Modifier
 ) {
+    val latestReview = uiState.latestNightlyReview
+    if (uiState.showNightlyReview && latestReview != null) {
+        NightlyReviewScreen(
+            review = latestReview,
+            feedback = uiState.nightlyReviewFeedback,
+            onBack = { onShowNightlyReview(false) },
+            onFeedback = onNightlyReviewFeedback,
+            modifier = modifier
+        )
+        return
+    }
+
     val timeFormatter = remember(zoneId) {
         DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()).withZone(zoneId)
     }
@@ -324,6 +343,20 @@ fun HealthAvailabilityScreen(
                     }
                 }
 
+                item {
+                    NightlyReviewControls(
+                        enabled = uiState.nightlyReviewEnabled,
+                        canEnable = uiState.exportFolderConfigured && uiState.backgroundReadAvailable,
+                        ready = uiState.exportFolderConfigured && uiState.backgroundReadPermissionGranted,
+                        running = uiState.isGeneratingNightlyReview,
+                        status = uiState.nightlyReviewStatus,
+                        hasReview = uiState.latestNightlyReview != null,
+                        onToggle = onToggleNightlyReview,
+                        onGenerateNow = onGenerateNightlyReviewNow,
+                        onOpenLatest = { onShowNightlyReview(true) }
+                    )
+                }
+
                 // 5 Domain Cards
                 items(
                     items = currentReport.domains,
@@ -352,6 +385,157 @@ fun HealthAvailabilityScreen(
 
     if (uiState.showDataBoundaries) {
         DataBoundariesDialog(onDismiss = { onShowDataBoundaries(false) })
+    }
+}
+
+@Composable
+private fun NightlyReviewControls(
+    enabled: Boolean,
+    canEnable: Boolean,
+    ready: Boolean,
+    running: Boolean,
+    status: String?,
+    hasReview: Boolean,
+    onToggle: () -> Unit,
+    onGenerateNow: () -> Unit,
+    onOpenLatest: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CleanSurface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Revisión nocturna", fontWeight = FontWeight.Bold, color = CleanTextPrimary)
+            Text(
+                if (enabled) "Activa · aproximadamente a las 22:30" else "Resumen factual y dos posibles acciones para mañana",
+                style = MaterialTheme.typography.bodySmall,
+                color = CleanTextSecondary
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onToggle, enabled = canEnable, modifier = Modifier.weight(1f)) {
+                    Text(if (enabled) "Pausar" else "Activar")
+                }
+                FilledTonalButton(
+                    onClick = onGenerateNow,
+                    enabled = ready && !running,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (running) "Revisando…" else "Revisar ahora")
+                }
+            }
+            if (hasReview) {
+                FilledTonalButton(onClick = onOpenLatest, modifier = Modifier.fillMaxWidth()) {
+                    Text("Ver última revisión")
+                }
+            }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = CleanTextSecondary) }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NightlyReviewScreen(
+    review: NightlyReview,
+    feedback: NightlyReviewFeedback?,
+    onBack: () -> Unit,
+    onFeedback: (NightlyReviewFeedback) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        modifier = modifier.fillMaxSize().testTag("nightly_review_screen"),
+        containerColor = CleanBackground,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Revisión del día", fontWeight = FontWeight.SemiBold)
+                        Text(review.date.toString(), fontSize = 11.sp, color = CleanTextSecondary)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = CleanBackground)
+            )
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CleanPrimaryContainer),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        review.summary,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+            item { ReviewSection("Lo observado", review.facts, CleanStatusAvailableText) }
+            item { ReviewSection("Huecos de datos", review.gaps, CleanTextSecondary) }
+            item { ReviewSection("Para mañana", review.nextActions, MaterialTheme.colorScheme.primary) }
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CleanSurface),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("¿Te ha servido?", fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilledTonalButton(
+                                onClick = { onFeedback(NightlyReviewFeedback.USEFUL) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (feedback == NightlyReviewFeedback.USEFUL) "Sí · guardado" else "Sí")
+                            }
+                            FilledTonalButton(
+                                onClick = { onFeedback(NightlyReviewFeedback.NOT_USEFUL) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Filled.ThumbDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (feedback == NightlyReviewFeedback.NOT_USEFUL) "No · guardado" else "No")
+                            }
+                        }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(16.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun ReviewSection(title: String, items: List<String>, accent: Color) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CleanSurface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, fontWeight = FontWeight.Bold, color = accent)
+            if (items.isEmpty()) {
+                Text("Nada que señalar con este snapshot.", style = MaterialTheme.typography.bodyMedium, color = CleanTextSecondary)
+            } else {
+                items.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, color = CleanTextPrimary) }
+            }
+        }
     }
 }
 
@@ -494,7 +678,11 @@ fun HealthAvailabilityScreenPreview() {
             onShowDataBoundaries = {},
             onChooseExportFolder = {},
             onExport = {},
-            onToggleAutomaticExport = {}
+            onToggleAutomaticExport = {},
+            onToggleNightlyReview = {},
+            onGenerateNightlyReviewNow = {},
+            onShowNightlyReview = {},
+            onNightlyReviewFeedback = {}
         )
     }
 }
