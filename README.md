@@ -30,6 +30,24 @@ It reports a domain as available, partial, unavailable, or requiring
 permission. No record is treated as zero, and a missing manual nutrition entry
 remains an explicit gap rather than an error.
 
+## Reading the dashboard
+
+Each domain card names the metrics Health Connect represents for the selected
+day. Observed metrics show their measured value and, when useful, their time or
+interval. Metrics without a record are named together instead of being hidden
+behind a count.
+
+Color communicates data state, not health quality:
+
+- green means a value was observed;
+- amber means the domain mixes observed metrics and gaps;
+- gray means no record was available for the selected day;
+- red means user action, normally a missing permission, is required;
+- blue is reserved for controls and domain identity.
+
+An unavailable value is never displayed as zero and does not imply inactivity,
+poor sleep, or another medical conclusion.
+
 ## Privacy boundary
 
 The app reads Health Connect in the foreground when opened. If you explicitly
@@ -78,12 +96,10 @@ companion repository documents that decision and the future local setup gate.
 
 ## Status
 
-The original five-signal Health Connect read path has been exercised on a
-physical device. Nutrition availability has also been confirmed after a manual
-Zepp entry. Foreground manual export to a user-selected Drive folder has been
-validated end to end: the Android artifact was written to Drive and read by
-ChatGPT Health with provenance and gaps intact. Opt-in automatic previous-day
-export is implemented and awaits physical-device validation. Comprehensive
-coverage, including exercise sessions, compiles and passes the unit suite in
-GitHub CI. It now awaits a physical-device check against a Fit workout after
-the expanded read permissions are granted.
+The expanded Health Connect read path has been exercised on a physical device
+with all supported permissions granted. Activity, Fit exercise sessions, Zepp
+body measurements and manual nutrition entries have appeared in the app.
+Foreground export and automatic previous-day export have both written the
+expected date-named Markdown files to the selected Drive folder. ChatGPT Health
+has read the earlier contract with provenance and explicit gaps intact; the
+latest expanded artifact still needs a final conversational read check.
