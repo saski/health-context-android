@@ -79,6 +79,34 @@ picker; it has no OAuth credentials or broad Drive access.
    ChatGPT Health project. The app reports a local write only; it does not
    claim that the project has already read the file.
 
+## Nightly review experiment
+
+The optional nightly review turns the daily snapshot into a small, local
+reflection loop. Enable it once after the Health context folder and background
+read access are configured. On Android 13 or later, also approve notifications.
+
+Around 22:30 local time, WorkManager reads the current day, updates the same
+`health-context-YYYY-MM-DD.md` file, stores the review locally, and posts a
+low-priority notification. Android may delay the exact time. Opening the
+notification shows:
+
+- selected facts that Health Connect actually reported;
+- explicit gaps, never values inferred as zero;
+- at most two cautious possible actions for the next day;
+- `useful` / `not useful` feedback stored only on the phone.
+
+The review is deterministic: it uses no AI, network service, diagnosis,
+personal target, or multi-day trend. **Review now** runs the same path for
+initial verification or recovery; it is not intended as a daily requirement.
+Enabling the experiment also keeps the existing morning export enabled. The
+following morning it recalculates and replaces the same Markdown file so late
+source synchronization is included. Pausing daily synchronization also pauses
+the nightly review because that self-correction is part of the experiment.
+
+Run the experiment for seven nights before expanding it. Its first success
+criterion is simple: did the notification save a manual end-of-day review, and
+did its two actions help plan the next day?
+
 An unavailable domain can simply mean that the relevant device was not worn,
 has not synchronized, or that no manual entry was made. It is not a diagnosis.
 

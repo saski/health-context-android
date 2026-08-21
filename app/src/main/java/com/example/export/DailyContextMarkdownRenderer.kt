@@ -2,6 +2,7 @@ package com.example.export
 
 import com.example.data.model.DayAvailabilityReport
 import com.example.data.model.HealthAvailabilityStatus
+import com.example.review.NightlyReviewGenerator
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
@@ -9,6 +10,7 @@ object DailyContextMarkdownRenderer {
     fun fileName(report: DayAvailabilityReport): String = "health-context-${report.date}.md"
 
     fun render(report: DayAvailabilityReport, generatedAt: Instant): String = buildString {
+        val review = NightlyReviewGenerator.generate(report, generatedAt)
         appendLine("# Health context — ${report.date}")
         appendLine()
         appendLine("- schema: health-context/v2")
@@ -16,6 +18,21 @@ object DailyContextMarkdownRenderer {
         appendLine("- timezone: ${report.zoneId.id}")
         appendLine("- overall_status: ${report.overallStatus.name.lowercase()}")
         appendLine("- snapshot: daily Health Connect read; generated in foreground or scheduled background; not a live feed")
+        appendLine()
+        appendLine("## Critical daily summary")
+        appendLine("- summary: ${review.summary}")
+        appendLine()
+        appendLine("### Observed facts")
+        review.facts.ifEmpty { listOf("No observed facts are available for this day.") }
+            .forEach { appendLine("- $it") }
+        appendLine()
+        appendLine("### Explicit gaps")
+        review.gaps.ifEmpty { listOf("No complete domain gap is present in this snapshot.") }
+            .forEach { appendLine("- $it") }
+        appendLine()
+        appendLine("### Possible next actions")
+        review.nextActions.ifEmpty { listOf("No next action is suggested from this snapshot alone.") }
+            .forEach { appendLine("- $it") }
         report.domains.forEach { domain ->
             appendLine()
             appendLine("## ${domain.domain.labelEs}")

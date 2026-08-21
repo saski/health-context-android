@@ -9,6 +9,11 @@ import com.example.data.model.SelectedDayTab
 import com.example.data.repository.HealthConnectRepository
 import com.example.export.DailyContextExportRepository
 import com.example.export.DailyExportScheduler
+import com.example.review.NightlyReviewFeedback
+import com.example.review.NightlyReviewNotifier
+import com.example.review.NightlyReviewScheduler
+import com.example.review.NightlyReviewStore
+import com.example.review.NightlyReviewTask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -23,6 +29,10 @@ class HealthAvailabilityViewModel(
     private val repository: HealthConnectRepository,
     private val exportRepository: DailyContextExportRepository,
     private val exportScheduler: DailyExportScheduler,
+    private val nightlyReviewStore: NightlyReviewStore,
+    private val nightlyReviewScheduler: NightlyReviewScheduler,
+    private val nightlyReviewNotifier: NightlyReviewNotifier,
+    private val clock: Clock = Clock.systemDefaultZone(),
     private val zoneId: ZoneId = ZoneId.systemDefault()
 ) : ViewModel() {
 
@@ -36,6 +46,12 @@ class HealthAvailabilityViewModel(
                 exportFolderConfigured = exportRepository.isConfigured(),
                 automaticExportEnabled = exportRepository.isAutomaticExportEnabled(),
                 automaticExportStatus = exportRepository.automaticExportStatus(),
+                nightlyReviewEnabled = nightlyReviewStore.isEnabled(),
+                nightlyReviewStatus = nightlyReviewStore.status(),
+                latestNightlyReview = nightlyReviewStore.latest(),
+                nightlyReviewFeedback = nightlyReviewStore.latest()?.let { review ->
+                    nightlyReviewStore.feedback(review.date)
+                },
                 backgroundReadAvailable = repository.isBackgroundReadAvailable()
             )
         }
@@ -83,6 +99,12 @@ class HealthAvailabilityViewModel(
                         backgroundReadPermissionGranted = repository.getBackgroundReadPermission() in granted,
                         automaticExportEnabled = exportRepository.isAutomaticExportEnabled(),
                         automaticExportStatus = exportRepository.automaticExportStatus(),
+                        nightlyReviewEnabled = nightlyReviewStore.isEnabled(),
+                        nightlyReviewStatus = nightlyReviewStore.status(),
+                        latestNightlyReview = nightlyReviewStore.latest(),
+                        nightlyReviewFeedback = nightlyReviewStore.latest()?.let { review ->
+                            nightlyReviewStore.feedback(review.date)
+                        },
                         lastRefreshed = Instant.now(),
                         isRefreshing = false
                     )
@@ -144,13 +166,153 @@ class HealthAvailabilityViewModel(
     fun disableAutomaticExport() {
         exportScheduler.disable()
         exportRepository.setAutomaticExportEnabled(false)
+        val nightlyWasEnabled = nightlyReviewStore.isEnabled()
+        if (nightlyWasEnabled) {
+            nightlyReviewScheduler.disable()
+            nightlyReviewStore.setEnabled(false)
+            nightlyReviewStore.recordStatus("Revisión nocturna pausada junto con la exportación diaria")
+        }
         _uiState.update {
             it.copy(
                 automaticExportEnabled = false,
                 automaticExportStatus = "Exportación automática pausada",
+                nightlyReviewEnabled = if (nightlyWasEnabled) false else it.nightlyReviewEnabled,
+                nightlyReviewStatus = if (nightlyWasEnabled) "Revisión nocturna pausada junto con la exportación diaria" else it.nightlyReviewStatus,
                 errorMessage = null
             )
         }
+    }
+
+    fun handleNightlyBackgroundPermissionResult(granted: Boolean) {
+        _uiState.update { it.copy(backgroundReadPermissionGranted = granted) }
+        if (!granted) {
+            _uiState.update { it.copy(errorMessage = "La revisión nocturna necesita lectura de Health Connect en segundo plano") }
+        }
+    }
+
+    fun handleNotificationPermissionResult(granted: Boolean) {
+        if (!granted) {
+            _uiState.update { it.copy(errorMessage = "Concede notificaciones para recibir la revisión nocturna") }
+        }
+    }
+
+    fun enableNightlyReview() {
+        val state = _uiState.value
+        when {
+            !state.exportFolderConfigured -> {
+                _uiState.update { it.copy(errorMessage = "Elige primero la carpeta Health context") }
+            }
+            !state.backgroundReadAvailable -> {
+                _uiState.update { it.copy(errorMessage = "Este dispositivo no ofrece lectura de Health Connect en segundo plano") }
+            }
+            !state.backgroundReadPermissionGranted -> {
+                _uiState.update { it.copy(errorMessage = "Concede la lectura en segundo plano para activar la revisión nocturna") }
+            }
+            else -> {
+                exportRepository.setAutomaticExportEnabled(true)
+                exportScheduler.enable()
+                nightlyReviewStore.setEnabled(true)
+                nightlyReviewScheduler.enable()
+                val status = "Revisión nocturna activa: se preparará aproximadamente a las 22:30"
+                nightlyReviewStore.recordStatus(status)
+                _uiState.update {
+                    it.copy(
+                        automaticExportEnabled = true,
+                        automaticExportStatus = "Automática activa: recalculará ayer cada mañana",
+                        nightlyReviewEnabled = true,
+                        nightlyReviewStatus = status,
+                        errorMessage = null
+                    )
+                }
+            }
+        }
+    }
+
+    fun disableNightlyReview() {
+        nightlyReviewScheduler.disable()
+        nightlyReviewStore.setEnabled(false)
+        val status = "Revisión nocturna pausada"
+        nightlyReviewStore.recordStatus(status)
+        _uiState.update {
+            it.copy(nightlyReviewEnabled = false, nightlyReviewStatus = status, errorMessage = null)
+        }
+    }
+
+    fun generateNightlyReviewNow() {
+        if (!exportRepository.isConfigured()) {
+            _uiState.update { it.copy(errorMessage = "Elige primero la carpeta Health context") }
+            return
+        }
+        if (!_uiState.value.backgroundReadPermissionGranted) {
+            _uiState.update { it.copy(errorMessage = "Concede primero la lectura de Health Connect en segundo plano") }
+            return
+        }
+        if (!_uiState.value.backgroundReadAvailable) {
+            _uiState.update { it.copy(errorMessage = "Este dispositivo no ofrece lectura de Health Connect en segundo plano") }
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isGeneratingNightlyReview = true, errorMessage = null) }
+            val result = NightlyReviewTask(
+                healthRepository = repository,
+                writer = exportRepository,
+                store = nightlyReviewStore,
+                notifier = nightlyReviewNotifier,
+                clock = clock,
+                zoneId = zoneId
+            ).run()
+            result.onSuccess { fileName ->
+                val status = "Revisión generada y exportada: $fileName"
+                nightlyReviewStore.recordStatus(status)
+                val review = nightlyReviewStore.latest()
+                _uiState.update {
+                    it.copy(
+                        isGeneratingNightlyReview = false,
+                        nightlyReviewStatus = status,
+                        latestNightlyReview = review,
+                        nightlyReviewFeedback = review?.let { item -> nightlyReviewStore.feedback(item.date) },
+                        showNightlyReview = review != null
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isGeneratingNightlyReview = false,
+                        errorMessage = "No se pudo generar la revisión: ${error.localizedMessage ?: "error desconocido"}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun showNightlyReview(show: Boolean) {
+        _uiState.update { it.copy(showNightlyReview = show) }
+    }
+
+    fun openNightlyReview(date: LocalDate?) {
+        val review = nightlyReviewStore.latest()
+        if (review == null) {
+            _uiState.update { it.copy(errorMessage = "Todavía no hay una revisión nocturna guardada") }
+            return
+        }
+        if (date != null && review.date != date) {
+            _uiState.update { it.copy(errorMessage = "La revisión de $date ya no está disponible en el teléfono") }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                latestNightlyReview = review,
+                nightlyReviewFeedback = nightlyReviewStore.feedback(review.date),
+                showNightlyReview = true,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun recordNightlyReviewFeedback(feedback: NightlyReviewFeedback) {
+        val review = _uiState.value.latestNightlyReview ?: return
+        nightlyReviewStore.recordFeedback(review.date, feedback)
+        _uiState.update { it.copy(nightlyReviewFeedback = feedback) }
     }
 
     fun exportSelectedDay() {
@@ -174,11 +336,24 @@ class HealthAvailabilityViewModel(
             repository: HealthConnectRepository,
             exportRepository: DailyContextExportRepository,
             exportScheduler: DailyExportScheduler,
+            nightlyReviewStore: NightlyReviewStore,
+            nightlyReviewScheduler: NightlyReviewScheduler,
+            nightlyReviewNotifier: NightlyReviewNotifier,
+            clock: Clock = Clock.systemDefaultZone(),
             zoneId: ZoneId = ZoneId.systemDefault()
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return HealthAvailabilityViewModel(repository, exportRepository, exportScheduler, zoneId) as T
+                return HealthAvailabilityViewModel(
+                    repository,
+                    exportRepository,
+                    exportScheduler,
+                    nightlyReviewStore,
+                    nightlyReviewScheduler,
+                    nightlyReviewNotifier,
+                    clock,
+                    zoneId
+                ) as T
             }
         }
     }
