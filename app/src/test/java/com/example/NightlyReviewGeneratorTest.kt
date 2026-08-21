@@ -41,11 +41,49 @@ class NightlyReviewGeneratorTest {
 
         assertEquals("2 de 3 áreas aportan datos; sueño queda sin cobertura.", review.summary)
         assertTrue(review.facts.contains("Actividad diaria: Pasos 6.210 pasos; Distancia 4,8 km."))
-        assertTrue(review.facts.contains("Entrenamientos: Elíptica 30 min (18:00 - 18:30)."))
+        assertTrue(
+            review.facts.contains(
+                "Entrenamientos: Elíptica 30 min (18:00 - 18:30; source: Health Connect)."
+            )
+        )
         assertTrue(review.gaps.contains("Sueño: Sin sesión de sueño utilizable."))
         assertFalse(review.renderPlainText().contains("0 horas"))
         assertFalse(review.renderPlainText().contains("bien"))
         assertFalse(review.renderPlainText().contains("mal"))
+    }
+
+    @Test
+    fun `puts workout facts first so bounded retrieval keeps the training context`() {
+        val report = report(
+            domain(
+                HealthDomain.STEPS,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("steps", "Pasos", HealthAvailabilityStatus.AVAILABLE, "5.413 pasos")
+            ),
+            domain(
+                HealthDomain.NUTRITION,
+                HealthAvailabilityStatus.PARTIAL,
+                metric("nutrition_energy_total", "Energía total", HealthAvailabilityStatus.AVAILABLE, "950 kcal")
+            ),
+            domain(
+                HealthDomain.EXERCISE,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric(
+                    "exercise_session_1",
+                    "Entrenamiento de fuerza",
+                    HealthAvailabilityStatus.AVAILABLE,
+                    "30 min",
+                    "14:45 - 15:15"
+                )
+            )
+        )
+
+        val review = NightlyReviewGenerator.generate(report, Instant.parse("2026-08-20T20:30:00Z"))
+
+        assertEquals(
+            "Entrenamientos: Entrenamiento de fuerza 30 min (14:45 - 15:15; source: Health Connect).",
+            review.facts.first()
+        )
     }
 
     @Test

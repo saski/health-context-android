@@ -31,7 +31,7 @@ class DailyContextMarkdownRendererTest {
 
         assertTrue(DailyContextMarkdownRenderer.fileName(report) == "health-context-2026-08-18.md")
         assertTrue(markdown.contains("overall_status: partial"))
-        assertTrue(markdown.contains("## Nightly review"))
+        assertTrue(markdown.contains("## Critical daily summary"))
         assertTrue(markdown.contains("### Observed facts"))
         assertTrue(markdown.contains("### Explicit gaps"))
         assertTrue(markdown.contains("### Possible next actions"))
@@ -77,5 +77,55 @@ class DailyContextMarkdownRendererTest {
         assertTrue(markdown.contains("observation: 30 min"))
         assertFalse(markdown.contains("latitude"))
         assertFalse(markdown.contains("longitude"))
+    }
+
+    @Test
+    fun `keeps the workout with provenance inside the initial retrieval prefix`() {
+        val report = DayAvailabilityReport(
+            date = LocalDate.of(2026, 8, 21),
+            zoneId = ZoneId.of("Europe/Madrid"),
+            domains = listOf(
+                DomainAvailability(
+                    domain = HealthDomain.STEPS,
+                    status = HealthAvailabilityStatus.AVAILABLE,
+                    source = "Health Connect",
+                    coveredThrough = "Total del día",
+                    reason = "Agregación diaria",
+                    metricSummary = "5.413 pasos"
+                ),
+                DomainAvailability(
+                    domain = HealthDomain.EXERCISE,
+                    status = HealthAvailabilityStatus.AVAILABLE,
+                    source = "com.huami.watch.hmwatchmanager",
+                    coveredThrough = "14:45 - 15:15",
+                    reason = "1 entrenamiento registrado",
+                    metrics = listOf(
+                        MetricAvailability(
+                            key = "exercise_session_1",
+                            label = "Entrenamiento de fuerza",
+                            status = HealthAvailabilityStatus.AVAILABLE,
+                            source = "com.huami.watch.hmwatchmanager",
+                            coveredThrough = "14:45 - 15:15",
+                            reason = "Sesión de entrenamiento registrada",
+                            observation = "30 min"
+                        )
+                    )
+                )
+            ),
+            overallStatus = HealthAvailabilityStatus.AVAILABLE,
+            unavailableDomains = emptyList()
+        )
+
+        val markdown = DailyContextMarkdownRenderer.render(report, Instant.parse("2026-08-21T13:31:54Z"))
+        val retrievalPrefix = markdown.take(2_048)
+
+        assertTrue(retrievalPrefix.contains("## Critical daily summary"))
+        assertTrue(
+            retrievalPrefix.contains(
+                "Entrenamientos: Entrenamiento de fuerza 30 min " +
+                    "(14:45 - 15:15; source: com.huami.watch.hmwatchmanager)."
+            )
+        )
+        assertTrue(markdown.indexOf("Entrenamientos: Entrenamiento de fuerza") < markdown.indexOf("## Actividad diaria"))
     }
 }

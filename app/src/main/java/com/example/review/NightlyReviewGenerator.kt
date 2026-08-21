@@ -30,7 +30,9 @@ object NightlyReviewGenerator {
         val covered = report.domains.count { it.hasObservedData() }
         val uncovered = report.domains.filter { !it.hasObservedData() }
         val summary = buildSummary(covered, report.domains.size, uncovered)
-        val facts = report.domains.mapNotNull(::factFor)
+        val facts = report.domains
+            .sortedBy { if (it.domain == HealthDomain.EXERCISE) 0 else 1 }
+            .mapNotNull(::factFor)
         val gaps = report.domains.mapNotNull(::gapFor)
         val actions = possibleActions(report).take(2)
 
@@ -79,7 +81,9 @@ object NightlyReviewGenerator {
                 append(' ')
                 append(metric.observation)
                 if (domain.domain == HealthDomain.EXERCISE && metric.coveredThrough != "Total del día") {
-                    append(" (${metric.coveredThrough})")
+                    append(" (${metric.coveredThrough}; source: ${metric.source})")
+                } else if (domain.domain == HealthDomain.EXERCISE) {
+                    append(" (source: ${metric.source})")
                 }
             }
         }

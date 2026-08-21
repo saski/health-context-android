@@ -19,7 +19,7 @@ object DailyContextMarkdownRenderer {
         appendLine("- overall_status: ${report.overallStatus.name.lowercase()}")
         appendLine("- snapshot: daily Health Connect read; generated in foreground or scheduled background; not a live feed")
         appendLine()
-        appendLine("## Nightly review")
+        appendLine("## Critical daily summary")
         appendLine("- summary: ${review.summary}")
         appendLine()
         appendLine("### Observed facts")
