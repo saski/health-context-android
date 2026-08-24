@@ -9,6 +9,7 @@ import com.example.data.model.SelectedDayTab
 import com.example.data.repository.HealthConnectRepository
 import com.example.export.DailyContextExportRepository
 import com.example.export.DailyExportScheduler
+import com.example.export.SnapshotStage
 import com.example.review.NightlyReviewFeedback
 import com.example.review.NightlyReviewGenerator
 import com.example.review.NightlyReviewNotifier
@@ -57,6 +58,8 @@ class HealthAvailabilityViewModel(
                 backgroundReadAvailable = repository.isBackgroundReadAvailable()
             )
         }
+        if (exportRepository.isAutomaticExportEnabled()) exportScheduler.enable()
+        if (nightlyReviewStore.isEnabled()) nightlyReviewScheduler.enable()
     }
 
     fun checkSdkStatus() {
@@ -329,7 +332,12 @@ class HealthAvailabilityViewModel(
             val generatedAt = Instant.now()
             val recentReports = repository.loadRecentReports(report.date, zoneId)
             val review = NightlyReviewGenerator.generate(report, generatedAt, recentReports)
-            exportRepository.export(report, generatedAt, review).onSuccess { fileName ->
+            val stage = if (report.date.isBefore(LocalDate.now(clock.withZone(zoneId)))) {
+                SnapshotStage.FINAL
+            } else {
+                SnapshotStage.PROVISIONAL
+            }
+            exportRepository.export(report, generatedAt, review, stage).onSuccess { fileName ->
                 _uiState.update { it.copy(isExporting = false, exportMessage = "Exportado localmente: $fileName") }
             }.onFailure { error ->
                 _uiState.update { it.copy(isExporting = false, errorMessage = "No se pudo exportar: ${error.localizedMessage}") }

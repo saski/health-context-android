@@ -6,6 +6,7 @@ import com.example.data.model.SdkAvailability
 import com.example.data.repository.HealthConnectRepository
 import com.example.export.DailyContextWriter
 import com.example.export.PreviousDayExportTask
+import com.example.export.SnapshotStage
 import com.example.review.NightlyReview
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -30,6 +31,7 @@ class PreviousDayExportTaskTest {
         assertEquals(LocalDate.of(2026, 8, 18), health.requestedDates.first())
         assertEquals(8, health.requestedDates.size)
         assertEquals(LocalDate.of(2026, 8, 18), writer.report?.date)
+        assertEquals(SnapshotStage.FINAL, writer.stage)
     }
 
     private class CapturingHealthRepository : HealthConnectRepository {
@@ -55,13 +57,16 @@ class PreviousDayExportTaskTest {
 
     private class CapturingWriter : DailyContextWriter {
         var report: DayAvailabilityReport? = null
+        var stage: SnapshotStage? = null
 
         override fun export(
             report: DayAvailabilityReport,
             generatedAt: Instant,
-            review: NightlyReview?
+            review: NightlyReview?,
+            stage: SnapshotStage
         ): Result<String> {
             this.report = report
+            this.stage = stage
             return Result.success("health-context-${report.date}.md")
         }
     }

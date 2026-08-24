@@ -6,6 +6,7 @@ import com.example.data.model.HealthAvailabilityStatus
 import com.example.data.model.HealthDomain
 import com.example.data.repository.HealthConnectRepository
 import com.example.export.DailyContextWriter
+import com.example.export.SnapshotStage
 import com.example.review.NightlyReview
 import com.example.review.NightlyReviewNotifier
 import com.example.review.NightlyReviewStore
@@ -88,9 +89,11 @@ class NightlyReviewTaskTest {
         override fun export(
             report: DayAvailabilityReport,
             generatedAt: Instant,
-            review: NightlyReview?
+            review: NightlyReview?,
+            stage: SnapshotStage
         ): Result<String> {
             events += "export"
+            assertEquals(SnapshotStage.PROVISIONAL, stage)
             return Result.success("health-context-${report.date}.md")
         }
     }
@@ -99,7 +102,8 @@ class NightlyReviewTaskTest {
         override fun export(
             report: DayAvailabilityReport,
             generatedAt: Instant,
-            review: NightlyReview?
+            review: NightlyReview?,
+            stage: SnapshotStage
         ): Result<String> {
             events += "export"
             return Result.failure(IllegalStateException("folder unavailable"))

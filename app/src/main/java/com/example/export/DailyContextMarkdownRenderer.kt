@@ -7,13 +7,19 @@ import com.example.review.NightlyReviewGenerator
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
+enum class SnapshotStage(val serializedName: String) {
+    PROVISIONAL("provisional"),
+    FINAL("final")
+}
+
 object DailyContextMarkdownRenderer {
     fun fileName(report: DayAvailabilityReport): String = "health-context-${report.date}.md"
 
     fun render(
         report: DayAvailabilityReport,
         generatedAt: Instant,
-        suppliedReview: NightlyReview? = null
+        suppliedReview: NightlyReview? = null,
+        stage: SnapshotStage = SnapshotStage.FINAL
     ): String = buildString {
         val review = suppliedReview ?: NightlyReviewGenerator.generate(report, generatedAt)
         appendLine("# Health context — ${report.date}")
@@ -21,6 +27,8 @@ object DailyContextMarkdownRenderer {
         appendLine("- schema: health-context/v2")
         appendLine("- generated_at: ${DateTimeFormatter.ISO_INSTANT.format(generatedAt)}")
         appendLine("- timezone: ${report.zoneId.id}")
+        appendLine("- snapshot_date: ${report.date}")
+        appendLine("- snapshot_stage: ${stage.serializedName}")
         appendLine("- overall_status: ${report.overallStatus.name.lowercase()}")
         appendLine("- snapshot: daily Health Connect read; generated in foreground or scheduled background; not a live feed")
         appendLine()

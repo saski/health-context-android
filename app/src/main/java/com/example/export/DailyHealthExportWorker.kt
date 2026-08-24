@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.repository.RealHealthConnectRepository
+import com.example.review.SharedPreferencesNightlyReviewStore
 import java.time.Clock
+import java.time.LocalDate
 import java.time.ZoneId
 
 class DailyHealthExportWorker(
@@ -28,12 +30,23 @@ class DailyHealthExportWorker(
             return Result.failure()
         }
 
-        val export = PreviousDayExportTask(
+        val clock = Clock.systemDefaultZone()
+        val zoneId = ZoneId.systemDefault()
+        val reviewStore = SharedPreferencesNightlyReviewStore(applicationContext)
+        val exportTask = PreviousDayExportTask(
             healthRepository = healthRepository,
             writer = writer,
-            clock = Clock.systemDefaultZone(),
-            zoneId = ZoneId.systemDefault()
-        ).run()
+            reviewStore = reviewStore,
+            clock = clock,
+            zoneId = zoneId
+        )
+        val export = runCatching {
+            val today = LocalDate.now(clock.withZone(zoneId))
+            val archiveDates = writer.existingArchiveDates().getOrThrow()
+            ExportRecoveryPolicy.datesToExport(today, archiveDates)
+                .map { date -> exportTask.run(date).getOrThrow() }
+                .last()
+        }
 
         return export.fold(
             onSuccess = { fileName ->

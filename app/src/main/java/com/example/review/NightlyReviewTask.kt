@@ -2,6 +2,7 @@ package com.example.review
 
 import com.example.data.repository.HealthConnectRepository
 import com.example.export.DailyContextWriter
+import com.example.export.SnapshotStage
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -20,7 +21,7 @@ class NightlyReviewTask(
         val report = healthRepository.loadDayAvailability(date, zoneId)
         val recentReports = healthRepository.loadRecentReports(date, zoneId)
         val review = NightlyReviewGenerator.generate(report, generatedAt, recentReports)
-        val fileName = writer.export(report, generatedAt, review).getOrThrow()
+        val fileName = writer.export(report, generatedAt, review, SnapshotStage.PROVISIONAL).getOrThrow()
         store.save(review)
         notifier.notify(review)
         fileName

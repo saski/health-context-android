@@ -12,7 +12,8 @@ interface DailyContextWriter {
     fun export(
         report: DayAvailabilityReport,
         generatedAt: Instant,
-        review: NightlyReview? = null
+        review: NightlyReview? = null,
+        stage: SnapshotStage = SnapshotStage.FINAL
     ): Result<String>
 }
 
@@ -44,21 +45,30 @@ class DailyContextExportRepository(private val context: Context) : DailyContextW
         preferences.edit().putString(automaticStatusKey, status).apply()
     }
 
+    fun existingArchiveDates(): Result<Set<java.time.LocalDate>> = runCatching {
+        val treeUri = configuredUri() ?: error("Elige primero la carpeta Health context")
+        val tree = DocumentFile.fromTreeUri(context, treeUri) ?: error("La carpeta elegida ya no está disponible")
+        DailyContextArchiveDates.parse(tree.listFiles().mapNotNull { it.name })
+    }
+
     override fun export(
         report: DayAvailabilityReport,
         generatedAt: Instant,
-        review: NightlyReview?
+        review: NightlyReview?,
+        stage: SnapshotStage
     ): Result<String> = runCatching {
         val treeUri = configuredUri() ?: error("Elige primero la carpeta Health context")
         val tree = DocumentFile.fromTreeUri(context, treeUri) ?: error("La carpeta elegida ya no está disponible")
-        val fileName = DailyContextMarkdownRenderer.fileName(report)
-        val file = tree.findFile(fileName)
-            ?: tree.createFile("text/markdown", fileName)
-            ?: error("No se pudo crear $fileName")
-        context.contentResolver.openOutputStream(file.uri, "wt")?.bufferedWriter()?.use {
-            it.write(DailyContextMarkdownRenderer.render(report, generatedAt, review))
-        } ?: error("No se pudo escribir $fileName")
-        fileName
+        val artifacts = DailyContextArtifacts.create(report, generatedAt, review, stage)
+        artifacts.forEach { artifact ->
+            val file = tree.findFile(artifact.fileName)
+                ?: tree.createFile("text/markdown", artifact.fileName)
+                ?: error("No se pudo crear ${artifact.fileName}")
+            context.contentResolver.openOutputStream(file.uri, "wt")?.bufferedWriter()?.use {
+                it.write(artifact.content)
+            } ?: error("No se pudo escribir ${artifact.fileName}")
+        }
+        artifacts.first().fileName
     }
 
     private fun configuredUri(): Uri? = preferences.getString(folderKey, null)?.let(Uri::parse)

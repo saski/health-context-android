@@ -6,6 +6,8 @@ import com.example.data.model.HealthAvailabilityStatus
 import com.example.data.model.HealthDomain
 import com.example.data.model.MetricAvailability
 import com.example.export.DailyContextMarkdownRenderer
+import com.example.export.DailyContextArtifacts
+import com.example.export.SnapshotStage
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +16,56 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class DailyContextMarkdownRendererTest {
+    @Test
+    fun `plans the dated artifact and latest alias with identical content`() {
+        val report = DayAvailabilityReport(
+            date = LocalDate.of(2026, 8, 24),
+            zoneId = ZoneId.of("Europe/Madrid"),
+            domains = emptyList(),
+            overallStatus = HealthAvailabilityStatus.PARTIAL,
+            unavailableDomains = emptyList()
+        )
+
+        val artifacts = DailyContextArtifacts.create(
+            report = report,
+            generatedAt = Instant.parse("2026-08-24T20:30:00Z"),
+            stage = SnapshotStage.PROVISIONAL
+        )
+
+        assertTrue(artifacts.map { it.fileName } == listOf(
+            "health-context-2026-08-24.md",
+            "health-context-latest.md"
+        ))
+        assertTrue(artifacts.map { it.content }.distinct().size == 1)
+        assertTrue(artifacts.first().content.contains("snapshot_stage: provisional"))
+    }
+
+    @Test
+    fun `renders explicit snapshot date and lifecycle stage`() {
+        val report = DayAvailabilityReport(
+            date = LocalDate.of(2026, 8, 24),
+            zoneId = ZoneId.of("Europe/Madrid"),
+            domains = emptyList(),
+            overallStatus = HealthAvailabilityStatus.PARTIAL,
+            unavailableDomains = emptyList()
+        )
+
+        val provisional = DailyContextMarkdownRenderer.render(
+            report,
+            Instant.parse("2026-08-24T20:30:00Z"),
+            stage = SnapshotStage.PROVISIONAL
+        )
+        val final = DailyContextMarkdownRenderer.render(
+            report,
+            Instant.parse("2026-08-25T07:00:00Z"),
+            stage = SnapshotStage.FINAL
+        )
+
+        assertTrue(provisional.contains("snapshot_date: 2026-08-24"))
+        assertTrue(provisional.contains("snapshot_stage: provisional"))
+        assertTrue(final.contains("snapshot_stage: final"))
+    }
+
     @Test
     fun `renders date named artifact and never turns an unavailable domain into zero`() {
         val report = DayAvailabilityReport(
