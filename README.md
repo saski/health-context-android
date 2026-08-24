@@ -61,8 +61,8 @@ picker; it has no OAuth credentials or broad Drive access.
 
 ## Use it
 
-1. Install the build from Google AI Studio on an Android device with Health
-   Connect available.
+1. Open the repository in Android Studio and run the `app` configuration on an
+   Android device with Health Connect available.
 2. Open **Salud Disponibilidad**.
 3. Tap **Conceder permisos** and approve the listed read permissions. The first
    update after this coverage expansion asks for more categories once.
@@ -119,15 +119,12 @@ has not synchronized, or that no manual entry was made. It is not a diagnosis.
 
 ## Development and synchronization
 
-Google AI Studio is the current Android build environment and synchronizes this
-repository on `main`. Let a synchronization finish before editing the same files
-elsewhere; do not create a second repository from AI Studio. For a change made
-locally, commit and push it here, then confirm that AI Studio reports the two
-surfaces as in sync.
+Android Studio is the primary build, test and device-install environment. Google
+AI Studio remains optional for experiments and must synchronize through this
+repository's `main` branch instead of acting as a separate source of truth.
 
-The local Android SDK, Android Studio, and ADB are intentionally deferred until
-the simpler browser-build and device-install path no longer meets the need. The
-companion repository documents that decision and the future local setup gate.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the verified local commands, USB setup
+and the one-time migration note for builds previously installed by AI Studio.
 
 ## Status
 
