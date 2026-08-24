@@ -32,10 +32,22 @@ remains an explicit gap rather than an error.
 
 ## Reading the dashboard
 
-Each domain card names the metrics Health Connect represents for the selected
-day. Observed metrics show their measured value and, when useful, their time or
-interval. Metrics without a record are named together instead of being hidden
-behind a count.
+The dashboard leads with the latest daily review: one supported conclusion and
+one suggested action. Daily domains follow below it. Each domain card shows up
+to three observed metrics with their measured value and, when useful, their
+time or interval. Open **View details** to see the remaining observations,
+named gaps, and missing permissions.
+
+An observed domain can also open its source app. If one installed source is
+available, the app launches it; if several sources contributed, Android shows
+a chooser. This opens the source app at its normal launcher entry point unless
+that app provides a stable public deep link. The app does not guess private
+vendor screens.
+
+Daily automation is summarized as **Ready**, **Needs attention**, or
+**Paused**. Its controls, folder selection, permissions, and manual recovery
+actions remain collapsed under **Configure** during normal use. A missing
+optional health observation is a data gap, not an automation failure.
 
 Color communicates data state, not health quality:
 
@@ -63,17 +75,17 @@ picker; it has no OAuth credentials or broad Drive access.
 
 1. Open the repository in Android Studio and run the `app` configuration on an
    Android device with Health Connect available.
-2. Open **Salud Disponibilidad**.
+2. Open **Mi salud**.
 3. Tap **Conceder permisos** and approve the listed read permissions. The first
    update after this coverage expansion asks for more categories once.
 4. The app refreshes when opened; **Actualizar** remains available as recovery.
-5. Under **Exportación diaria a Drive**, tap **Elegir carpeta** and choose the
+5. Open **Configure**, tap **Choose folder**, and choose the
    `Health context` folder in Google Drive. Android will remember only that
    folder until you change it.
-6. Tap **Activar automático** and grant Health Connect background-read access.
+6. Tap **Enable export** and grant Health Connect background-read access.
    The app immediately attempts yesterday's export and schedules a daily run
-   around 09:00 local time. Android may defer the exact execution time.
-7. Use **Exportar hoy ahora** or **Exportar ayer ahora** only as a manual
+   in the morning. Android may defer the exact execution time.
+7. Use **Export the selected day now** only as a manual
    recovery path.
 8. Wait for Google Drive to show the file, then start a conversation in the
    ChatGPT Health project. The app reports a local write only; it does not
@@ -85,30 +97,38 @@ The optional nightly review turns the daily snapshot into a small, local
 reflection loop. Enable it once after the Health context folder and background
 read access are configured. On Android 13 or later, also approve notifications.
 
-Around 22:30 local time, WorkManager reads the current day, updates the same
-`health-context-YYYY-MM-DD.md` file, stores the review locally, and posts a
-low-priority notification. Android may delay the exact time. Opening the
-notification shows:
+Around 22:30 local time, WorkManager reads the current day, writes a
+**provisional** snapshot, stores the review locally, and posts a low-priority
+notification. Android may delay the exact time. Every successful export writes
+both the dated archive `health-context-YYYY-MM-DD.md` and the stable
+`health-context-latest.md` entry point. Opening the notification shows:
 
 - one supported conclusion instead of a raw metric dump;
-- interpreted evidence and evolution against the previous seven days;
+- interpreted evidence against the previous seven days and, when coverage is
+  sufficient, evolution against the preceding twenty-one days;
 - confidence limits, never values inferred as zero;
 - at most two cautious suggestions for the next day;
+- a one-tap **Good**, **Loaded**, or **Unwell** feeling, also available from the
+  review screen and stored only on the phone;
 - `useful` / `not useful` feedback stored only on the phone.
 
 The review is deterministic: it uses no AI, network service, diagnosis, or
-automatic training prescription. A personal comparison requires at least three
-comparable observations within the previous seven days. A same-day review is
-marked provisional, and a morning review does not judge unfinished activity or
-nutrition. A workout appears only when Health Connect supplies an actual
-exercise-session record; isolated speed, cadence, or power cannot create one.
+automatic training prescription. A personal comparison requires enough
+comparable observations in both periods. Workout count and total duration use
+actual exercise-session records only; isolated speed, cadence, or power cannot
+create a workout. A recorded feeling is subjective context, never a clinical
+measurement.
 
 **Review now** runs the same path for initial verification or recovery; it is
 not intended as a daily requirement.
-Enabling the experiment also keeps the existing morning export enabled. The
-following morning it recalculates and replaces the same Markdown file so late
-source synchronization and the recent comparison are included. Pausing daily synchronization also pauses
-the nightly review because that self-correction is part of the experiment.
+Enabling the experiment also keeps the morning export enabled. The following
+morning the app silently recalculates yesterday, incorporates late source
+synchronization and the recorded feeling, and replaces both the dated file and
+`health-context-latest.md` with a **final** snapshot. It does not send a second
+notification. If Android missed scheduled work, the next run fills missing
+dated artifacts within the previous seven days and always finalizes yesterday,
+without duplicating dates. Pausing daily synchronization also pauses the nightly
+review because that self-correction is part of the experiment.
 
 Run the experiment for seven nights before expanding it. Its first success
 criterion is simple: did the notification save a manual end-of-day review, and
