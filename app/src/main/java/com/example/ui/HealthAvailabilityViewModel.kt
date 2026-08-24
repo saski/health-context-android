@@ -10,10 +10,12 @@ import com.example.data.repository.HealthConnectRepository
 import com.example.export.DailyContextExportRepository
 import com.example.export.DailyExportScheduler
 import com.example.review.NightlyReviewFeedback
+import com.example.review.NightlyReviewGenerator
 import com.example.review.NightlyReviewNotifier
 import com.example.review.NightlyReviewScheduler
 import com.example.review.NightlyReviewStore
 import com.example.review.NightlyReviewTask
+import com.example.review.loadRecentReports
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -323,7 +325,10 @@ class HealthAvailabilityViewModel(
         }
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isExporting = true, exportMessage = null, errorMessage = null) }
-            exportRepository.export(report, Instant.now()).onSuccess { fileName ->
+            val generatedAt = Instant.now()
+            val recentReports = repository.loadRecentReports(report.date, zoneId)
+            val review = NightlyReviewGenerator.generate(report, generatedAt, recentReports)
+            exportRepository.export(report, generatedAt, review).onSuccess { fileName ->
                 _uiState.update { it.copy(isExporting = false, exportMessage = "Exportado localmente: $fileName") }
             }.onFailure { error ->
                 _uiState.update { it.copy(isExporting = false, errorMessage = "No se pudo exportar: ${error.localizedMessage}") }

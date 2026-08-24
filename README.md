@@ -90,17 +90,24 @@ Around 22:30 local time, WorkManager reads the current day, updates the same
 low-priority notification. Android may delay the exact time. Opening the
 notification shows:
 
-- selected facts that Health Connect actually reported;
-- explicit gaps, never values inferred as zero;
-- at most two cautious possible actions for the next day;
+- one supported conclusion instead of a raw metric dump;
+- interpreted evidence and evolution against the previous seven days;
+- confidence limits, never values inferred as zero;
+- at most two cautious suggestions for the next day;
 - `useful` / `not useful` feedback stored only on the phone.
 
-The review is deterministic: it uses no AI, network service, diagnosis,
-personal target, or multi-day trend. **Review now** runs the same path for
-initial verification or recovery; it is not intended as a daily requirement.
+The review is deterministic: it uses no AI, network service, diagnosis, or
+automatic training prescription. A personal comparison requires at least three
+comparable observations within the previous seven days. A same-day review is
+marked provisional, and a morning review does not judge unfinished activity or
+nutrition. A workout appears only when Health Connect supplies an actual
+exercise-session record; isolated speed, cadence, or power cannot create one.
+
+**Review now** runs the same path for initial verification or recovery; it is
+not intended as a daily requirement.
 Enabling the experiment also keeps the existing morning export enabled. The
 following morning it recalculates and replaces the same Markdown file so late
-source synchronization is included. Pausing daily synchronization also pauses
+source synchronization and the recent comparison are included. Pausing daily synchronization also pauses
 the nightly review because that self-correction is part of the experiment.
 
 Run the experiment for seven nights before expanding it. Its first success

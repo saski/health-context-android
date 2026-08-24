@@ -59,7 +59,7 @@ class AndroidNightlyReviewNotifier(private val context: Context) : NightlyReview
                 "Revisión nocturna de salud",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Resumen factual diario generado desde Health Connect"
+                description = "Interpretación diaria generada desde Health Connect"
             }
         )
     }

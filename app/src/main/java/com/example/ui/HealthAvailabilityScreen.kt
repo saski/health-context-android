@@ -484,9 +484,9 @@ private fun NightlyReviewScreen(
                     )
                 }
             }
-            item { ReviewSection("Lo observado", review.facts, CleanStatusAvailableText) }
-            item { ReviewSection("Huecos de datos", review.gaps, CleanTextSecondary) }
-            item { ReviewSection("Para mañana", review.nextActions, MaterialTheme.colorScheme.primary) }
+            item { ReviewSection("Qué significa", review.facts, CleanStatusAvailableText) }
+            item { ReviewSection("Evolución y confianza", review.gaps, CleanTextSecondary) }
+            item { ReviewSection("Sugerencias", review.nextActions, MaterialTheme.colorScheme.primary) }
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CleanSurface),

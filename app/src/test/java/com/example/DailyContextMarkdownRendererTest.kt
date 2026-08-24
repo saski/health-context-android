@@ -32,9 +32,9 @@ class DailyContextMarkdownRendererTest {
         assertTrue(DailyContextMarkdownRenderer.fileName(report) == "health-context-2026-08-18.md")
         assertTrue(markdown.contains("overall_status: partial"))
         assertTrue(markdown.contains("## Critical daily summary"))
-        assertTrue(markdown.contains("### Observed facts"))
-        assertTrue(markdown.contains("### Explicit gaps"))
-        assertTrue(markdown.contains("### Possible next actions"))
+        assertTrue(markdown.contains("### Interpretation"))
+        assertTrue(markdown.contains("### Evolution and confidence"))
+        assertTrue(markdown.contains("### Suggestions"))
         assertTrue(markdown.contains("gap: unavailable; no value is inferred as zero"))
         assertFalse(markdown.contains("sleep: 0"))
     }
@@ -122,10 +122,10 @@ class DailyContextMarkdownRendererTest {
         assertTrue(retrievalPrefix.contains("## Critical daily summary"))
         assertTrue(
             retrievalPrefix.contains(
-                "Entrenamientos: Entrenamiento de fuerza 30 min " +
-                    "(14:45 - 15:15; source: com.huami.watch.hmwatchmanager)."
+                "Entrenamiento registrado: Entrenamiento de fuerza · 30 min · " +
+                    "14:45 - 15:15 · origen: com.huami.watch.hmwatchmanager."
             )
         )
-        assertTrue(markdown.indexOf("Entrenamientos: Entrenamiento de fuerza") < markdown.indexOf("## Actividad diaria"))
+        assertTrue(markdown.indexOf("Entrenamiento registrado: Entrenamiento de fuerza") < markdown.indexOf("## Actividad diaria"))
     }
 }

@@ -18,8 +18,9 @@ class NightlyReviewTask(
         val generatedAt = clock.instant()
         val date = LocalDate.now(clock.withZone(zoneId))
         val report = healthRepository.loadDayAvailability(date, zoneId)
-        val review = NightlyReviewGenerator.generate(report, generatedAt)
-        val fileName = writer.export(report, generatedAt).getOrThrow()
+        val recentReports = healthRepository.loadRecentReports(date, zoneId)
+        val review = NightlyReviewGenerator.generate(report, generatedAt, recentReports)
+        val fileName = writer.export(report, generatedAt, review).getOrThrow()
         store.save(review)
         notifier.notify(review)
         fileName

@@ -5,10 +5,15 @@ import android.content.Intent
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.example.data.model.DayAvailabilityReport
+import com.example.review.NightlyReview
 import java.time.Instant
 
 interface DailyContextWriter {
-    fun export(report: DayAvailabilityReport, generatedAt: Instant): Result<String>
+    fun export(
+        report: DayAvailabilityReport,
+        generatedAt: Instant,
+        review: NightlyReview? = null
+    ): Result<String>
 }
 
 class DailyContextExportRepository(private val context: Context) : DailyContextWriter {
@@ -39,7 +44,11 @@ class DailyContextExportRepository(private val context: Context) : DailyContextW
         preferences.edit().putString(automaticStatusKey, status).apply()
     }
 
-    override fun export(report: DayAvailabilityReport, generatedAt: Instant): Result<String> = runCatching {
+    override fun export(
+        report: DayAvailabilityReport,
+        generatedAt: Instant,
+        review: NightlyReview?
+    ): Result<String> = runCatching {
         val treeUri = configuredUri() ?: error("Elige primero la carpeta Health context")
         val tree = DocumentFile.fromTreeUri(context, treeUri) ?: error("La carpeta elegida ya no está disponible")
         val fileName = DailyContextMarkdownRenderer.fileName(report)
@@ -47,7 +56,7 @@ class DailyContextExportRepository(private val context: Context) : DailyContextW
             ?: tree.createFile("text/markdown", fileName)
             ?: error("No se pudo crear $fileName")
         context.contentResolver.openOutputStream(file.uri, "wt")?.bufferedWriter()?.use {
-            it.write(DailyContextMarkdownRenderer.render(report, generatedAt))
+            it.write(DailyContextMarkdownRenderer.render(report, generatedAt, review))
         } ?: error("No se pudo escribir $fileName")
         fileName
     }

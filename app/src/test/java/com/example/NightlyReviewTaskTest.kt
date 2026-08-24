@@ -33,7 +33,8 @@ class NightlyReviewTaskTest {
         val result = NightlyReviewTask(health, writer, store, notifier, clock, zone).run()
 
         assertTrue(result.isSuccess)
-        assertEquals(LocalDate.of(2026, 8, 20), health.requestedDate)
+        assertEquals(LocalDate.of(2026, 8, 20), health.requestedDates.first())
+        assertEquals(8, health.requestedDates.size)
         assertEquals(listOf("export", "save", "notify"), events)
         assertEquals("health-context-2026-08-20.md", result.getOrNull())
     }
@@ -56,14 +57,14 @@ class NightlyReviewTaskTest {
     }
 
     private class CapturingHealthRepository : HealthConnectRepository {
-        var requestedDate: LocalDate? = null
+        val requestedDates = mutableListOf<LocalDate>()
         override fun getSdkAvailability() = com.example.data.model.SdkAvailability.AVAILABLE
         override suspend fun getGrantedPermissions() = emptySet<String>()
         override fun getRequiredPermissions() = emptySet<String>()
         override fun getBackgroundReadPermission() = "background"
         override fun isBackgroundReadAvailable() = true
         override suspend fun loadDayAvailability(date: LocalDate, zoneId: ZoneId): DayAvailabilityReport {
-            requestedDate = date
+            requestedDates += date
             return DayAvailabilityReport(
                 date = date,
                 zoneId = zoneId,
@@ -84,14 +85,22 @@ class NightlyReviewTaskTest {
     }
 
     private class CapturingWriter(private val events: MutableList<String>) : DailyContextWriter {
-        override fun export(report: DayAvailabilityReport, generatedAt: Instant): Result<String> {
+        override fun export(
+            report: DayAvailabilityReport,
+            generatedAt: Instant,
+            review: NightlyReview?
+        ): Result<String> {
             events += "export"
             return Result.success("health-context-${report.date}.md")
         }
     }
 
     private class FailingWriter(private val events: MutableList<String>) : DailyContextWriter {
-        override fun export(report: DayAvailabilityReport, generatedAt: Instant): Result<String> {
+        override fun export(
+            report: DayAvailabilityReport,
+            generatedAt: Instant,
+            review: NightlyReview?
+        ): Result<String> {
             events += "export"
             return Result.failure(IllegalStateException("folder unavailable"))
         }
