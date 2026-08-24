@@ -335,7 +335,8 @@ class ComprehensiveHealthReader(
         return HealthStatusMapper.mapMetricDomain(
             HealthDomain.WEIGHT,
             metrics,
-            "Sin mediciones corporales registradas"
+            "Sin mediciones corporales registradas",
+            optionalKeys = setOf("height")
         )
     }
 
