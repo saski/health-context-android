@@ -6,6 +6,7 @@ import com.example.data.model.SdkAvailability
 import com.example.data.repository.HealthConnectRepository
 import com.example.export.DailyContextWriter
 import com.example.export.PreviousDayExportTask
+import com.example.review.NightlyReview
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -26,12 +27,13 @@ class PreviousDayExportTaskTest {
         val result = PreviousDayExportTask(health, writer, clock, zone).run()
 
         assertTrue(result.isSuccess)
-        assertEquals(LocalDate.of(2026, 8, 18), health.requestedDate)
+        assertEquals(LocalDate.of(2026, 8, 18), health.requestedDates.first())
+        assertEquals(8, health.requestedDates.size)
         assertEquals(LocalDate.of(2026, 8, 18), writer.report?.date)
     }
 
     private class CapturingHealthRepository : HealthConnectRepository {
-        var requestedDate: LocalDate? = null
+        val requestedDates = mutableListOf<LocalDate>()
 
         override fun getSdkAvailability() = SdkAvailability.AVAILABLE
         override suspend fun getGrantedPermissions() = getRequiredPermissions() + getBackgroundReadPermission()
@@ -40,7 +42,7 @@ class PreviousDayExportTaskTest {
         override fun isBackgroundReadAvailable() = true
 
         override suspend fun loadDayAvailability(date: LocalDate, zoneId: ZoneId): DayAvailabilityReport {
-            requestedDate = date
+            requestedDates += date
             return DayAvailabilityReport(
                 date = date,
                 zoneId = zoneId,
@@ -54,7 +56,11 @@ class PreviousDayExportTaskTest {
     private class CapturingWriter : DailyContextWriter {
         var report: DayAvailabilityReport? = null
 
-        override fun export(report: DayAvailabilityReport, generatedAt: Instant): Result<String> {
+        override fun export(
+            report: DayAvailabilityReport,
+            generatedAt: Instant,
+            review: NightlyReview?
+        ): Result<String> {
             this.report = report
             return Result.success("health-context-${report.date}.md")
         }

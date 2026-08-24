@@ -133,13 +133,17 @@ object HealthStatusMapper {
     fun mapMetricDomain(
         domain: HealthDomain,
         metrics: List<MetricAvailability>,
-        noDataReason: String
+        noDataReason: String,
+        optionalKeys: Set<String> = emptySet()
     ): DomainAvailability {
-        val available = metrics.filter { it.status == HealthAvailabilityStatus.AVAILABLE }
-        val permissionNeeded = metrics.filter { it.status == HealthAvailabilityStatus.PERMISSION_NEEDED }
+        val relevantMetrics = metrics.filterNot { metric ->
+            metric.key in optionalKeys && metric.status != HealthAvailabilityStatus.AVAILABLE
+        }
+        val available = relevantMetrics.filter { it.status == HealthAvailabilityStatus.AVAILABLE }
+        val permissionNeeded = relevantMetrics.filter { it.status == HealthAvailabilityStatus.PERMISSION_NEEDED }
         val status = when {
-            metrics.isEmpty() -> HealthAvailabilityStatus.UNAVAILABLE
-            available.size == metrics.size -> HealthAvailabilityStatus.AVAILABLE
+            relevantMetrics.isEmpty() -> HealthAvailabilityStatus.UNAVAILABLE
+            available.size == relevantMetrics.size -> HealthAvailabilityStatus.AVAILABLE
             available.isNotEmpty() -> HealthAvailabilityStatus.PARTIAL
             permissionNeeded.isNotEmpty() -> HealthAvailabilityStatus.PERMISSION_NEEDED
             else -> HealthAvailabilityStatus.UNAVAILABLE
@@ -167,8 +171,8 @@ object HealthStatusMapper {
             source = source,
             coveredThrough = coverage,
             reason = reason,
-            metricSummary = "${available.size} de ${metrics.size} métricas con datos",
-            metrics = metrics
+            metricSummary = "${available.size} de ${relevantMetrics.size} métricas con datos",
+            metrics = relevantMetrics
         )
     }
 

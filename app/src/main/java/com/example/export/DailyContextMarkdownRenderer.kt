@@ -2,6 +2,7 @@ package com.example.export
 
 import com.example.data.model.DayAvailabilityReport
 import com.example.data.model.HealthAvailabilityStatus
+import com.example.review.NightlyReview
 import com.example.review.NightlyReviewGenerator
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -9,8 +10,12 @@ import java.time.format.DateTimeFormatter
 object DailyContextMarkdownRenderer {
     fun fileName(report: DayAvailabilityReport): String = "health-context-${report.date}.md"
 
-    fun render(report: DayAvailabilityReport, generatedAt: Instant): String = buildString {
-        val review = NightlyReviewGenerator.generate(report, generatedAt)
+    fun render(
+        report: DayAvailabilityReport,
+        generatedAt: Instant,
+        suppliedReview: NightlyReview? = null
+    ): String = buildString {
+        val review = suppliedReview ?: NightlyReviewGenerator.generate(report, generatedAt)
         appendLine("# Health context — ${report.date}")
         appendLine()
         appendLine("- schema: health-context/v2")
@@ -22,16 +27,16 @@ object DailyContextMarkdownRenderer {
         appendLine("## Critical daily summary")
         appendLine("- summary: ${review.summary}")
         appendLine()
-        appendLine("### Observed facts")
-        review.facts.ifEmpty { listOf("No observed facts are available for this day.") }
+        appendLine("### Interpretation")
+        review.facts.ifEmpty { listOf("No reliable interpretation is available for this day.") }
             .forEach { appendLine("- $it") }
         appendLine()
-        appendLine("### Explicit gaps")
-        review.gaps.ifEmpty { listOf("No complete domain gap is present in this snapshot.") }
+        appendLine("### Evolution and confidence")
+        review.gaps.ifEmpty { listOf("No additional confidence limitation is present in this snapshot.") }
             .forEach { appendLine("- $it") }
         appendLine()
-        appendLine("### Possible next actions")
-        review.nextActions.ifEmpty { listOf("No next action is suggested from this snapshot alone.") }
+        appendLine("### Suggestions")
+        review.nextActions.ifEmpty { listOf("No change is suggested from this snapshot alone.") }
             .forEach { appendLine("- $it") }
         report.domains.forEach { domain ->
             appendLine()

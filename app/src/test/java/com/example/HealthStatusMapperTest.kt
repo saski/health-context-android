@@ -17,6 +17,38 @@ import java.time.ZoneId
 class HealthStatusMapperTest {
 
     @Test
+    fun `missing optional height does not make body coverage partial`() {
+        val result = HealthStatusMapper.mapMetricDomain(
+            domain = HealthDomain.WEIGHT,
+            metrics = listOf(
+                MetricAvailability(
+                    key = "weight",
+                    label = "Peso",
+                    status = HealthAvailabilityStatus.AVAILABLE,
+                    source = "com.huami.watch.hmwatchmanager",
+                    coveredThrough = "10:00",
+                    reason = "Medición disponible",
+                    observation = "69.1 kg"
+                ),
+                MetricAvailability(
+                    key = "height",
+                    label = "Altura",
+                    status = HealthAvailabilityStatus.UNAVAILABLE,
+                    source = HealthStatusMapper.SOURCE_NOT_AVAILABLE,
+                    coveredThrough = HealthStatusMapper.NO_USABLE_RECORD,
+                    reason = "Sin registro para este día"
+                )
+            ),
+            noDataReason = "Sin mediciones corporales registradas",
+            optionalKeys = setOf("height")
+        )
+
+        assertEquals(HealthAvailabilityStatus.AVAILABLE, result.status)
+        assertEquals("1 de 1 métricas con datos", result.metricSummary)
+        assertEquals(listOf("weight"), result.metrics.map { it.key })
+    }
+
+    @Test
     fun `expanded domain is partial when it contains observed metrics and honest gaps`() {
         val result = HealthStatusMapper.mapMetricDomain(
             domain = HealthDomain.RESTING_HEART_RATE,
