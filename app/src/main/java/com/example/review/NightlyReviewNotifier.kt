@@ -40,11 +40,29 @@ class AndroidNightlyReviewNotifier(private val context: Context) : NightlyReview
             .setContentText(review.summary)
             .setStyle(NotificationCompat.BigTextStyle().bigText(review.summary))
             .setContentIntent(pendingIntent)
+            .addAction(feelingAction(review, NightlyFeeling.GOOD, "Bien"))
+            .addAction(feelingAction(review, NightlyFeeling.LOADED, "Cargado"))
+            .addAction(feelingAction(review, NightlyFeeling.UNWELL, "Mal"))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun feelingAction(
+        review: NightlyReview,
+        feeling: NightlyFeeling,
+        label: String
+    ): NotificationCompat.Action {
+        val intent = NightlyFeelingReceiver.intent(context, review.date, feeling)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            31 * review.date.hashCode() + feeling.ordinal,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Action.Builder(0, label, pendingIntent).build()
     }
 
     private fun canNotify(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||

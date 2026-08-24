@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -37,11 +38,17 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -299,8 +306,10 @@ fun OverallStatusCard(
 @Composable
 fun HealthDomainCard(
     availability: DomainAvailability,
+    onOpenSource: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var expanded by rememberSaveable(availability.domain.name) { mutableStateOf(false) }
     val icon = when (availability.domain) {
         HealthDomain.STEPS -> Icons.Filled.DirectionsWalk
         HealthDomain.EXERCISE -> Icons.Filled.FitnessCenter
@@ -381,6 +390,16 @@ fun HealthDomainCard(
                     },
                     modifier = Modifier.weight(1f)
                 )
+                if (onOpenSource != null) {
+                    IconButton(onClick = onOpenSource, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Filled.OpenInNew,
+                            contentDescription = "Abrir fuente de ${availability.domain.labelEs}",
+                            tint = CleanPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
                 StatusBadge(status = availability.status)
             }
 
@@ -395,15 +414,16 @@ fun HealthDomainCard(
                     it.status == HealthAvailabilityStatus.PERMISSION_NEEDED
                 }
 
-                if (observedMetrics.isNotEmpty()) {
+                val visibleObserved = if (expanded) observedMetrics else observedMetrics.take(3)
+                if (visibleObserved.isNotEmpty()) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        observedMetrics.forEach { metric -> ObservedMetricChip(metric) }
+                        visibleObserved.forEach { metric -> ObservedMetricChip(metric) }
                     }
                 }
-                if (unavailableMetrics.isNotEmpty()) {
+                if (expanded && unavailableMetrics.isNotEmpty()) {
                     MetricGapLine(
                         label = "Sin registro",
                         metrics = unavailableMetrics,
@@ -411,13 +431,22 @@ fun HealthDomainCard(
                         dotColor = CleanStatusUnavailableBorder
                     )
                 }
-                if (permissionMetrics.isNotEmpty()) {
+                if (expanded && permissionMetrics.isNotEmpty()) {
                     MetricGapLine(
                         label = "Permiso necesario",
                         metrics = permissionMetrics,
                         color = CleanStatusPermissionText,
                         dotColor = CleanStatusPermissionText
                     )
+                }
+                val hiddenCount = observedMetrics.size - visibleObserved.size + unavailableMetrics.size + permissionMetrics.size
+                if (hiddenCount > 0 || expanded) {
+                    TextButton(
+                        onClick = { expanded = !expanded },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) {
+                        Text(if (expanded) "Ocultar detalle" else "Ver detalle · $hiddenCount más")
+                    }
                 }
             } else {
                 val fallback = availability.metricSummary

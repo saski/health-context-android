@@ -174,7 +174,7 @@ class DailyContextMarkdownRendererTest {
         assertTrue(retrievalPrefix.contains("## Critical daily summary"))
         assertTrue(
             retrievalPrefix.contains(
-                "Entrenamiento registrado: Entrenamiento de fuerza · 30 min · " +
+                "Entrenamiento registrado: 1 sesión · 30 min en total. Detalle: Entrenamiento de fuerza · 30 min · " +
                     "14:45 - 15:15 · origen: com.huami.watch.hmwatchmanager."
             )
         )

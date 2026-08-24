@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,10 +29,12 @@ import com.example.review.NightlyReviewScheduler
 import com.example.review.SharedPreferencesNightlyReviewStore
 import com.example.ui.HealthAvailabilityScreen
 import com.example.ui.HealthAvailabilityViewModel
+import com.example.ui.SourceAppNavigator
 import com.example.ui.theme.MyApplicationTheme
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
+    private val sourceAppNavigator by lazy { SourceAppNavigator(applicationContext) }
 
     private val viewModel: HealthAvailabilityViewModel by viewModels {
         HealthAvailabilityViewModel.provideFactory(
@@ -145,7 +148,17 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onShowNightlyReview = { viewModel.showNightlyReview(it) },
-                    onNightlyReviewFeedback = { viewModel.recordNightlyReviewFeedback(it) }
+                    onNightlyReviewFeedback = { viewModel.recordNightlyReviewFeedback(it) },
+                    onNightlyFeeling = { viewModel.recordNightlyFeeling(it) },
+                    onOpenDomainSource = { packages ->
+                        if (!sourceAppNavigator.open(packages)) {
+                            Toast.makeText(
+                                applicationContext,
+                                "La aplicación de origen no está disponible para abrirla",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
                 )
             }
         }

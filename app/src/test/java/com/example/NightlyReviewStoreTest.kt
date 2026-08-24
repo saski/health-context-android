@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.review.NightlyReview
 import com.example.review.NightlyReviewFeedback
+import com.example.review.NightlyFeeling
 import com.example.review.SharedPreferencesNightlyReviewStore
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -42,8 +43,10 @@ class NightlyReviewStoreTest {
 
         store.save(review)
         store.recordFeedback(review.date, NightlyReviewFeedback.USEFUL)
+        store.recordFeeling(review.date, NightlyFeeling.GOOD)
 
         assertEquals(review, store.latest())
         assertEquals(NightlyReviewFeedback.USEFUL, store.feedback(review.date))
+        assertEquals(NightlyFeeling.GOOD, store.feeling(review.date))
     }
 }

@@ -11,6 +11,7 @@ import com.example.export.DailyContextExportRepository
 import com.example.export.DailyExportScheduler
 import com.example.export.SnapshotStage
 import com.example.review.NightlyReviewFeedback
+import com.example.review.NightlyFeeling
 import com.example.review.NightlyReviewGenerator
 import com.example.review.NightlyReviewNotifier
 import com.example.review.NightlyReviewScheduler
@@ -54,6 +55,9 @@ class HealthAvailabilityViewModel(
                 latestNightlyReview = nightlyReviewStore.latest(),
                 nightlyReviewFeedback = nightlyReviewStore.latest()?.let { review ->
                     nightlyReviewStore.feedback(review.date)
+                },
+                nightlyFeeling = nightlyReviewStore.latest()?.let { review ->
+                    nightlyReviewStore.feeling(review.date)
                 },
                 backgroundReadAvailable = repository.isBackgroundReadAvailable()
             )
@@ -110,6 +114,9 @@ class HealthAvailabilityViewModel(
                         latestNightlyReview = nightlyReviewStore.latest(),
                         nightlyReviewFeedback = nightlyReviewStore.latest()?.let { review ->
                             nightlyReviewStore.feedback(review.date)
+                        },
+                        nightlyFeeling = nightlyReviewStore.latest()?.let { review ->
+                            nightlyReviewStore.feeling(review.date)
                         },
                         lastRefreshed = Instant.now(),
                         isRefreshing = false
@@ -309,6 +316,7 @@ class HealthAvailabilityViewModel(
             it.copy(
                 latestNightlyReview = review,
                 nightlyReviewFeedback = nightlyReviewStore.feedback(review.date),
+                nightlyFeeling = nightlyReviewStore.feeling(review.date),
                 showNightlyReview = true,
                 errorMessage = null
             )
@@ -319,6 +327,12 @@ class HealthAvailabilityViewModel(
         val review = _uiState.value.latestNightlyReview ?: return
         nightlyReviewStore.recordFeedback(review.date, feedback)
         _uiState.update { it.copy(nightlyReviewFeedback = feedback) }
+    }
+
+    fun recordNightlyFeeling(feeling: NightlyFeeling) {
+        val review = _uiState.value.latestNightlyReview ?: return
+        nightlyReviewStore.recordFeeling(review.date, feeling)
+        _uiState.update { it.copy(nightlyFeeling = feeling) }
     }
 
     fun exportSelectedDay() {

@@ -3,6 +3,7 @@ package com.example
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.example.data.model.DomainAvailability
 import com.example.data.model.HealthAvailabilityStatus
 import com.example.data.model.HealthDomain
@@ -51,6 +52,7 @@ class HealthDomainCardTest {
         assertTextExists("4.218 pasos")
         assertTextExists("Distancia")
         assertTextExists("3.2 km")
+        composeTestRule.onNodeWithText("Ver detalle · 2 más").performClick()
         assertTextExists("Sin registro: Calorías activas · Cadencia media de pasos")
         assertTextDoesNotExist("2 de 4 métricas con datos")
         assertTextDoesNotExist("Hay datos y huecos explícitos en este dominio")
@@ -83,6 +85,7 @@ class HealthDomainCardTest {
             }
         }
 
+        composeTestRule.onNodeWithText("Ver detalle · 2 más").performClick()
         assertTextExists("Sin registro: Saturación de oxígeno")
         assertTextExists("Permiso necesario: Frecuencia cardíaca")
     }

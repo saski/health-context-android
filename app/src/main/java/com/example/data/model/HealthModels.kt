@@ -2,6 +2,7 @@ package com.example.data.model
 
 import com.example.review.NightlyReview
 import com.example.review.NightlyReviewFeedback
+import com.example.review.NightlyFeeling
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -36,7 +37,8 @@ data class MetricAvailability(
     val source: String,
     val coveredThrough: String,
     val reason: String,
-    val observation: String? = null
+    val observation: String? = null,
+    val sourcePackages: Set<String> = emptySet()
 )
 
 /**
@@ -49,7 +51,8 @@ data class DomainAvailability(
     val coveredThrough: String,   // Período o marca de tiempo de cobertura o "Sin registro utilizable"
     val reason: String,           // Motivo fáctico del estado
     val metricSummary: String? = null, // Resumen descriptivo opcional (sin interpretación médica)
-    val metrics: List<MetricAvailability> = emptyList()
+    val metrics: List<MetricAvailability> = emptyList(),
+    val sourcePackages: Set<String> = emptySet()
 )
 
 /**
@@ -96,6 +99,7 @@ data class HealthUiState(
     val nightlyReviewStatus: String? = null,
     val latestNightlyReview: NightlyReview? = null,
     val nightlyReviewFeedback: NightlyReviewFeedback? = null,
+    val nightlyFeeling: NightlyFeeling? = null,
     val isGeneratingNightlyReview: Boolean = false,
     val showNightlyReview: Boolean = false,
     val showDataBoundaries: Boolean = false,
@@ -173,7 +177,8 @@ object HealthStatusMapper {
             coveredThrough = coverage,
             reason = reason,
             metricSummary = "${available.size} de ${relevantMetrics.size} métricas con datos",
-            metrics = relevantMetrics
+            metrics = relevantMetrics,
+            sourcePackages = available.flatMap { it.sourcePackages }.toSet()
         )
     }
 
@@ -205,7 +210,8 @@ object HealthStatusMapper {
                 source = sourceText,
                 coveredThrough = "Agregación acumulada del día",
                 reason = "Agregación diaria procesada por Health Connect",
-                metricSummary = "$total pasos agregados"
+                metricSummary = "$total pasos agregados",
+                sourcePackages = data.dataOrigins
             )
         } else {
             return DomainAvailability(
@@ -252,7 +258,8 @@ object HealthStatusMapper {
             source = source,
             coveredThrough = coverage,
             reason = "Sesión de sueño disponible en Health Connect",
-            metricSummary = data.extraFactualInfo
+            metricSummary = data.extraFactualInfo,
+            sourcePackages = data.dataOriginPackage?.let(::setOf).orEmpty()
         )
     }
 

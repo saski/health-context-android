@@ -35,7 +35,7 @@ class NightlyReviewTaskTest {
 
         assertTrue(result.isSuccess)
         assertEquals(LocalDate.of(2026, 8, 20), health.requestedDates.first())
-        assertEquals(8, health.requestedDates.size)
+        assertEquals(29, health.requestedDates.size)
         assertEquals(listOf("export", "save", "notify"), events)
         assertEquals("health-context-2026-08-20.md", result.getOrNull())
     }
@@ -121,6 +121,8 @@ class NightlyReviewTaskTest {
         override fun recordStatus(status: String) = Unit
         override fun feedback(date: LocalDate) = null
         override fun recordFeedback(date: LocalDate, feedback: com.example.review.NightlyReviewFeedback) = Unit
+        override fun feeling(date: LocalDate) = null
+        override fun recordFeeling(date: LocalDate, feeling: com.example.review.NightlyFeeling) = Unit
     }
 
     private class CapturingNotifier(private val events: MutableList<String>) : NightlyReviewNotifier {

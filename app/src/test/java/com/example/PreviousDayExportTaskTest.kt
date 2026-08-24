@@ -29,7 +29,7 @@ class PreviousDayExportTaskTest {
 
         assertTrue(result.isSuccess)
         assertEquals(LocalDate.of(2026, 8, 18), health.requestedDates.first())
-        assertEquals(8, health.requestedDates.size)
+        assertEquals(29, health.requestedDates.size)
         assertEquals(LocalDate.of(2026, 8, 18), writer.report?.date)
         assertEquals(SnapshotStage.FINAL, writer.stage)
     }

@@ -627,7 +627,11 @@ class ComprehensiveHealthReader(
         source: String,
         coverage: String,
         observation: String,
-        reason: String
+        reason: String,
+        sourcePackages: Set<String> = source.split(',')
+            .map(String::trim)
+            .filter { it.matches(Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")) }
+            .toSet()
     ) = MetricAvailability(
         key = key,
         label = label,
@@ -635,7 +639,8 @@ class ComprehensiveHealthReader(
         source = source,
         coveredThrough = coverage,
         reason = reason,
-        observation = observation
+        observation = observation,
+        sourcePackages = sourcePackages
     )
 
     private fun unavailable(key: String, label: String, reason: String) = MetricAvailability(

@@ -39,6 +39,10 @@
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
         <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
             <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
         </intent>
     </queries>
@@ -52,6 +56,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
+        <receiver
+            android:name=".review.NightlyFeelingReceiver"
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -13,6 +13,8 @@ interface NightlyReviewStore {
     fun recordStatus(status: String)
     fun feedback(date: LocalDate): NightlyReviewFeedback?
     fun recordFeedback(date: LocalDate, feedback: NightlyReviewFeedback)
+    fun feeling(date: LocalDate): NightlyFeeling?
+    fun recordFeeling(date: LocalDate, feeling: NightlyFeeling)
 }
 
 class SharedPreferencesNightlyReviewStore(context: Context) : NightlyReviewStore {
@@ -61,6 +63,14 @@ class SharedPreferencesNightlyReviewStore(context: Context) : NightlyReviewStore
         preferences.edit().putString("$FEEDBACK_PREFIX$date", feedback.name).apply()
     }
 
+    override fun feeling(date: LocalDate): NightlyFeeling? =
+        preferences.getString("$FEELING_PREFIX$date", null)
+            ?.let { runCatching { NightlyFeeling.valueOf(it) }.getOrNull() }
+
+    override fun recordFeeling(date: LocalDate, feeling: NightlyFeeling) {
+        preferences.edit().putString("$FEELING_PREFIX$date", feeling.name).apply()
+    }
+
     private fun encode(values: List<String>): String = values.joinToString(SEPARATOR)
 
     private fun decode(value: String?): List<String> = value
@@ -79,6 +89,7 @@ class SharedPreferencesNightlyReviewStore(context: Context) : NightlyReviewStore
         private const val LATEST_GAPS_KEY = "latest_gaps"
         private const val LATEST_ACTIONS_KEY = "latest_actions"
         private const val FEEDBACK_PREFIX = "feedback_"
+        private const val FEELING_PREFIX = "feeling_"
         private const val SEPARATOR = "\u001F"
     }
 }

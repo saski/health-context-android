@@ -23,3 +23,9 @@ enum class NightlyReviewFeedback {
     USEFUL,
     NOT_USEFUL
 }
+
+enum class NightlyFeeling(val labelEs: String) {
+    GOOD("bien"),
+    LOADED("cargado"),
+    UNWELL("mal")
+}

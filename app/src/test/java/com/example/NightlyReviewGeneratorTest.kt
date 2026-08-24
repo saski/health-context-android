@@ -6,6 +6,7 @@ import com.example.data.model.HealthAvailabilityStatus
 import com.example.data.model.HealthDomain
 import com.example.data.model.MetricAvailability
 import com.example.review.NightlyReviewGenerator
+import com.example.review.NightlyFeeling
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +15,60 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class NightlyReviewGeneratorTest {
+    @Test
+    fun `compares the recent seven days with the preceding twenty one when coverage is sufficient`() {
+        val today = sleepReport(LocalDate.of(2026, 8, 24), "7h 25m")
+        val recent = (1L..7L).map { sleepReport(today.date.minusDays(it), "7h 30m") }
+        val earlier = (8L..28L).map { sleepReport(today.date.minusDays(it), "6h 30m") }
+
+        val review = NightlyReviewGenerator.generate(
+            report = today,
+            generatedAt = Instant.parse("2026-08-24T20:30:00Z"),
+            recentReports = recent + earlier
+        )
+
+        assertTrue(review.facts.any { it.contains("Últimos 7 días") && it.contains("1 h más") })
+    }
+
+    @Test
+    fun `summarizes real training sessions as count and total duration`() {
+        val today = report(
+            LocalDate.of(2026, 8, 24),
+            domain(
+                HealthDomain.EXERCISE,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("exercise_session_1", "Fuerza", HealthAvailabilityStatus.AVAILABLE, "30 min"),
+                metric("exercise_session_2", "Elíptica", HealthAvailabilityStatus.AVAILABLE, "20 min")
+            )
+        )
+
+        val review = NightlyReviewGenerator.generate(today, Instant.parse("2026-08-24T20:30:00Z"))
+
+        assertTrue(review.facts.any { it.contains("2 sesiones") && it.contains("50 min") })
+    }
+
+    @Test
+    fun `uses a loaded feeling as context without making a diagnosis`() {
+        val today = report(
+            LocalDate.of(2026, 8, 24),
+            domain(
+                HealthDomain.EXERCISE,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("exercise_session_1", "Fuerza", HealthAvailabilityStatus.AVAILABLE, "30 min")
+            )
+        )
+
+        val review = NightlyReviewGenerator.generate(
+            today,
+            Instant.parse("2026-08-25T07:00:00Z"),
+            feeling = NightlyFeeling.LOADED
+        )
+
+        assertTrue(review.facts.any { it.contains("sensación", ignoreCase = true) && it.contains("cargado") })
+        assertTrue(review.nextActions.any { it.contains("sesión fácil") || it.contains("descanso") })
+        assertFalse(review.renderPlainText().contains("diagnóstico"))
+    }
+
     @Test
     fun `interprets an incomplete morning without calling isolated speed a workout`() {
         val report = report(

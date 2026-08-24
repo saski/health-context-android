@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,7 +42,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,11 +59,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.HealthUiState
+import com.example.data.model.HealthAvailabilityStatus
 import com.example.data.model.SdkAvailability
 import com.example.data.model.SelectedDayTab
 import com.example.data.repository.FakeHealthConnectRepository
 import com.example.review.NightlyReview
 import com.example.review.NightlyReviewFeedback
+import com.example.review.NightlyFeeling
 import com.example.ui.components.DataBoundariesDialog
 import com.example.ui.components.DataBoundariesFooterBox
 import com.example.ui.components.HealthDomainCard
@@ -93,6 +100,8 @@ fun HealthAvailabilityScreen(
     onGenerateNightlyReviewNow: () -> Unit,
     onShowNightlyReview: (Boolean) -> Unit,
     onNightlyReviewFeedback: (NightlyReviewFeedback) -> Unit,
+    onNightlyFeeling: (NightlyFeeling) -> Unit = {},
+    onOpenDomainSource: (Set<String>) -> Unit = {},
     zoneId: ZoneId = ZoneId.systemDefault(),
     modifier: Modifier = Modifier
 ) {
@@ -101,8 +110,10 @@ fun HealthAvailabilityScreen(
         NightlyReviewScreen(
             review = latestReview,
             feedback = uiState.nightlyReviewFeedback,
+            feeling = uiState.nightlyFeeling,
             onBack = { onShowNightlyReview(false) },
             onFeedback = onNightlyReviewFeedback,
+            onFeeling = onNightlyFeeling,
             modifier = modifier
         )
         return
@@ -111,6 +122,16 @@ fun HealthAvailabilityScreen(
     val timeFormatter = remember(zoneId) {
         DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()).withZone(zoneId)
     }
+    var setupExpanded by rememberSaveable { mutableStateOf(false) }
+    val automationHealth = AutomationHealth.evaluate(
+        uiState.automaticExportEnabled,
+        uiState.nightlyReviewEnabled,
+        uiState.exportFolderConfigured,
+        uiState.backgroundReadAvailable,
+        uiState.backgroundReadPermissionGranted,
+        uiState.automaticExportStatus,
+        uiState.nightlyReviewStatus
+    )
 
     Scaffold(
         modifier = modifier
@@ -122,7 +143,7 @@ fun HealthAvailabilityScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Salud Disponibilidad",
+                            text = "Mi salud",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = CleanTextPrimary
@@ -137,15 +158,9 @@ fun HealthAvailabilityScreen(
                     }
                 },
                 actions = {
-                    // Refresh Button (Clean Minimalism Styled)
-                    Button(
+                    IconButton(
                         onClick = onRefresh,
                         enabled = !uiState.isRefreshing,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CleanPrimaryContainer,
-                            contentColor = CleanStatusAvailableText
-                        ),
-                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .padding(end = 4.dp)
                             .testTag("btn_refresh")
@@ -156,24 +171,12 @@ fun HealthAvailabilityScreen(
                                 strokeWidth = 2.dp,
                                 color = CleanStatusAvailableText
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Actualizando…",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
                         } else {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                contentDescription = stringResource(R.string.refresh),
+                                modifier = Modifier.size(20.dp),
                                 tint = CleanStatusAvailableText
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(R.string.refresh),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -212,60 +215,6 @@ fun HealthAvailabilityScreen(
                 }
             }
 
-            // Permissions action if permissions are missing
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.timezone_label, zoneId.id),
-                        fontSize = 11.sp,
-                        color = CleanTextSecondary
-                    )
-                    FilledTonalButton(
-                        onClick = if (uiState.requiredPermissionsGranted) {
-                            onManagePermissions
-                        } else {
-                            onRequestPermissions
-                        },
-                        modifier = Modifier.testTag("btn_request_permissions"),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = CleanContainer,
-                            contentColor = if (uiState.requiredPermissionsGranted) {
-                                CleanStatusAvailableText
-                            } else {
-                                CleanTextPrimary
-                            }
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (uiState.requiredPermissionsGranted) {
-                                Icons.Filled.CheckCircle
-                            } else {
-                                Icons.Filled.Shield
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = stringResource(
-                                if (uiState.requiredPermissionsGranted) {
-                                    R.string.manage_permissions
-                                } else {
-                                    R.string.grant_permissions
-                                }
-                            ),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
             // Error banner if any
             if (uiState.errorMessage != null) {
                 item {
@@ -295,6 +244,22 @@ fun HealthAvailabilityScreen(
 
             if (currentReport != null) {
                 item {
+                    CleanDayNavigation(
+                        selectedTab = uiState.selectedTab,
+                        onSelectTab = onSelectTab
+                    )
+                }
+
+                uiState.latestNightlyReview?.let { review ->
+                    item {
+                        LatestReviewSummaryCard(
+                            review = review,
+                            onOpen = { onShowNightlyReview(true) }
+                        )
+                    }
+                }
+
+                item {
                     val timestampStr = uiState.lastRefreshed?.let {
                         val dayLabel = if (uiState.selectedTab == SelectedDayTab.TODAY) "Hoy" else "Ayer"
                         "$dayLabel, ${timeFormatter.format(it)}"
@@ -305,85 +270,48 @@ fun HealthAvailabilityScreen(
                     )
                 }
 
-                // Clean Minimalism Nav Pill Tab Bar
-                item {
-                    CleanDayNavigation(
-                        selectedTab = uiState.selectedTab,
-                        onSelectTab = onSelectTab
-                    )
-                }
-
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Sincronización diaria",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = CleanTextPrimary
-                        )
-                        Text(
-                            text = if (uiState.automaticExportEnabled) {
-                                "Activa: cada mañana exportará automáticamente el día anterior. Android puede retrasar la hora exacta."
-                            } else {
-                                "Elige la carpeta Health context y activa una vez la lectura en segundo plano."
-                            },
-                            fontSize = 12.sp,
-                            color = CleanTextSecondary
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilledTonalButton(onClick = onChooseExportFolder, modifier = Modifier.weight(1f)) {
-                                Text(if (uiState.exportFolderConfigured) "Cambiar carpeta" else "Elegir carpeta")
-                            }
-                            Button(
-                                onClick = onToggleAutomaticExport,
-                                enabled = uiState.exportFolderConfigured && uiState.backgroundReadAvailable,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(if (uiState.automaticExportEnabled) "Pausar automático" else "Activar automático")
-                            }
-                        }
-                        FilledTonalButton(
-                            onClick = onExport,
-                            enabled = uiState.exportFolderConfigured && !uiState.isExporting,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            val selectedDay = if (uiState.selectedTab == SelectedDayTab.TODAY) "hoy" else "ayer"
-                            Text(if (uiState.isExporting) "Exportando…" else "Exportar $selectedDay ahora")
-                        }
-                        if (!uiState.backgroundReadAvailable) {
-                            Text(
-                                "La lectura automática no está disponible en este dispositivo.",
-                                fontSize = 12.sp,
-                                color = CleanTextSecondary
-                            )
-                        }
-                        uiState.automaticExportStatus?.let { Text(it, fontSize = 12.sp, color = CleanTextSecondary) }
-                        uiState.exportMessage?.let { Text(it, fontSize = 12.sp, color = CleanTextSecondary) }
-                    }
-                }
-
-                item {
-                    NightlyReviewControls(
-                        enabled = uiState.nightlyReviewEnabled,
-                        canEnable = uiState.exportFolderConfigured && uiState.backgroundReadAvailable,
-                        ready = uiState.exportFolderConfigured && uiState.backgroundReadPermissionGranted,
-                        running = uiState.isGeneratingNightlyReview,
-                        status = uiState.nightlyReviewStatus,
-                        hasReview = uiState.latestNightlyReview != null,
-                        onToggle = onToggleNightlyReview,
-                        onGenerateNow = onGenerateNightlyReviewNow,
-                        onOpenLatest = { onShowNightlyReview(true) }
-                    )
-                }
-
                 // 5 Domain Cards
                 items(
                     items = currentReport.domains,
                     key = { it.domain.name }
                 ) { domainAvailability ->
-                    HealthDomainCard(availability = domainAvailability)
+                    HealthDomainCard(
+                        availability = domainAvailability,
+                        onOpenSource = domainAvailability.sourcePackages
+                            .takeIf {
+                                it.isNotEmpty() && domainAvailability.status != HealthAvailabilityStatus.UNAVAILABLE &&
+                                    domainAvailability.status != HealthAvailabilityStatus.PERMISSION_NEEDED
+                            }
+                            ?.let { packages -> { onOpenDomainSource(packages) } }
+                    )
+                }
+
+                item {
+                    AutomationSetupCard(
+                        state = automationHealth,
+                        expanded = setupExpanded,
+                        uiState = uiState,
+                        zoneId = zoneId,
+                        onToggleExpanded = { setupExpanded = !setupExpanded },
+                        onRequestPermissions = onRequestPermissions,
+                        onManagePermissions = onManagePermissions,
+                        onChooseExportFolder = onChooseExportFolder,
+                        onToggleAutomaticExport = onToggleAutomaticExport,
+                        onExport = onExport,
+                        onToggleNightlyReview = onToggleNightlyReview,
+                        onGenerateNightlyReviewNow = onGenerateNightlyReviewNow,
+                        onShowNightlyReview = { onShowNightlyReview(true) }
+                    )
                 }
             } else if (!uiState.isRefreshing) {
+                item {
+                    FilledTonalButton(
+                        onClick = if (uiState.requiredPermissionsGranted) onManagePermissions else onRequestPermissions,
+                        modifier = Modifier.fillMaxWidth().testTag("btn_request_permissions")
+                    ) {
+                        Text(if (uiState.requiredPermissionsGranted) "Gestionar permisos" else "Conceder permisos")
+                    }
+                }
                 // Empty state before first refresh
                 item {
                     EmptyStateCard(
@@ -404,6 +332,121 @@ fun HealthAvailabilityScreen(
 
     if (uiState.showDataBoundaries) {
         DataBoundariesDialog(onDismiss = { onShowDataBoundaries(false) })
+    }
+}
+
+@Composable
+private fun LatestReviewSummaryCard(
+    review: NightlyReview,
+    onOpen: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CleanPrimaryContainer),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Revisión del ${review.date}", fontSize = 11.sp, color = CleanTextSecondary)
+            Text(review.summary, fontWeight = FontWeight.SemiBold, color = CleanTextPrimary)
+            review.nextActions.firstOrNull()?.let { action ->
+                Text("Para mañana · $action", style = MaterialTheme.typography.bodySmall, color = CleanStatusAvailableText)
+            }
+            Text("Ver revisión completa", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun AutomationSetupCard(
+    state: AutomationHealthState,
+    expanded: Boolean,
+    uiState: HealthUiState,
+    zoneId: ZoneId,
+    onToggleExpanded: () -> Unit,
+    onRequestPermissions: () -> Unit,
+    onManagePermissions: () -> Unit,
+    onChooseExportFolder: () -> Unit,
+    onToggleAutomaticExport: () -> Unit,
+    onExport: () -> Unit,
+    onToggleNightlyReview: () -> Unit,
+    onGenerateNightlyReviewNow: () -> Unit,
+    onShowNightlyReview: () -> Unit
+) {
+    val label = when (state) {
+        AutomationHealthState.READY -> "Automatización lista"
+        AutomationHealthState.ATTENTION_REQUIRED -> "Automatización necesita atención"
+        AutomationHealthState.PAUSED -> "Automatización pausada"
+    }
+    val detail = when (state) {
+        AutomationHealthState.READY -> "Revisión nocturna y corrección matinal activas"
+        AutomationHealthState.ATTENTION_REQUIRED -> "Abre la configuración para corregir el acceso"
+        AutomationHealthState.PAUSED -> "Actívala una vez para olvidarte del proceso diario"
+    }
+    val containerColor = when (state) {
+        AutomationHealthState.READY -> com.example.ui.theme.CleanStatusAvailableBg
+        AutomationHealthState.ATTENTION_REQUIRED -> com.example.ui.theme.CleanStatusPartialBg
+        AutomationHealthState.PAUSED -> CleanSurface
+    }
+    val accentColor = when (state) {
+        AutomationHealthState.READY -> CleanStatusAvailableText
+        AutomationHealthState.ATTENTION_REQUIRED -> com.example.ui.theme.CleanStatusPartialText
+        AutomationHealthState.PAUSED -> CleanTextSecondary
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleExpanded)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(label, fontWeight = FontWeight.Bold, color = accentColor)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = CleanTextSecondary)
+            Text(
+                if (expanded) "Ocultar configuración" else "Configurar",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (expanded) {
+                Text(stringResource(R.string.timezone_label, zoneId.id), fontSize = 11.sp, color = CleanTextSecondary)
+                FilledTonalButton(
+                    onClick = if (uiState.requiredPermissionsGranted) onManagePermissions else onRequestPermissions,
+                    modifier = Modifier.fillMaxWidth().testTag("btn_request_permissions")
+                ) {
+                    Text(if (uiState.requiredPermissionsGranted) "Gestionar permisos" else "Conceder permisos")
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = onChooseExportFolder, modifier = Modifier.weight(1f)) {
+                        Text(if (uiState.exportFolderConfigured) "Cambiar carpeta" else "Elegir carpeta")
+                    }
+                    Button(
+                        onClick = onToggleAutomaticExport,
+                        enabled = uiState.exportFolderConfigured && uiState.backgroundReadAvailable,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (uiState.automaticExportEnabled) "Pausar exportación" else "Activar exportación")
+                    }
+                }
+                FilledTonalButton(
+                    onClick = onExport,
+                    enabled = uiState.exportFolderConfigured && !uiState.isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (uiState.isExporting) "Exportando…" else "Exportar el día seleccionado ahora")
+                }
+                NightlyReviewControls(
+                    enabled = uiState.nightlyReviewEnabled,
+                    canEnable = uiState.exportFolderConfigured && uiState.backgroundReadAvailable,
+                    ready = uiState.exportFolderConfigured && uiState.backgroundReadPermissionGranted,
+                    running = uiState.isGeneratingNightlyReview,
+                    status = uiState.nightlyReviewStatus,
+                    hasReview = uiState.latestNightlyReview != null,
+                    onToggle = onToggleNightlyReview,
+                    onGenerateNow = onGenerateNightlyReviewNow,
+                    onOpenLatest = onShowNightlyReview
+                )
+                uiState.automaticExportStatus?.let { Text(it, fontSize = 11.sp, color = CleanTextSecondary) }
+                uiState.exportMessage?.let { Text(it, fontSize = 11.sp, color = CleanTextSecondary) }
+            }
+        }
     }
 }
 
@@ -461,8 +504,10 @@ private fun NightlyReviewControls(
 private fun NightlyReviewScreen(
     review: NightlyReview,
     feedback: NightlyReviewFeedback?,
+    feeling: NightlyFeeling?,
     onBack: () -> Unit,
     onFeedback: (NightlyReviewFeedback) -> Unit,
+    onFeeling: (NightlyFeeling) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -506,6 +551,40 @@ private fun NightlyReviewScreen(
             item { ReviewSection("Qué significa", review.facts, CleanStatusAvailableText) }
             item { ReviewSection("Evolución y confianza", review.gaps, CleanTextSecondary) }
             item { ReviewSection("Sugerencias", review.nextActions, MaterialTheme.colorScheme.primary) }
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CleanSurface),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("¿Cómo te sentías?", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Una señal subjetiva para interpretar mejor mañana.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CleanTextSecondary
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            NightlyFeeling.entries.forEach { option ->
+                                FilledTonalButton(
+                                    onClick = { onFeeling(option) },
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 6.dp)
+                                ) {
+                                    Text(
+                                        when (option) {
+                                            NightlyFeeling.GOOD -> if (feeling == option) "Bien ✓" else "Bien"
+                                            NightlyFeeling.LOADED -> if (feeling == option) "Cargado ✓" else "Cargado"
+                                            NightlyFeeling.UNWELL -> if (feeling == option) "Mal ✓" else "Mal"
+                                        },
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CleanSurface),

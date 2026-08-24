@@ -21,7 +21,12 @@ class PreviousDayExportTask(
         val report = healthRepository.loadDayAvailability(date, zoneId)
         val generatedAt = clock.instant()
         val recentReports = healthRepository.loadRecentReports(date, zoneId)
-        val review = NightlyReviewGenerator.generate(report, generatedAt, recentReports)
+        val review = NightlyReviewGenerator.generate(
+            report,
+            generatedAt,
+            recentReports,
+            reviewStore?.feeling(date)
+        )
         val fileName = writer.export(report, generatedAt, review, SnapshotStage.FINAL).getOrThrow()
         reviewStore?.save(review)
         fileName
