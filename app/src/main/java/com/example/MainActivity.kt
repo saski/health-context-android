@@ -56,9 +56,7 @@ class MainActivity : ComponentActivity() {
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     contract = PermissionController.createRequestPermissionResultContract()
-                ) {
-                    viewModel.refresh()
-                }
+                ) { }
                 val backgroundPermissionLauncher = rememberLauncherForActivityResult(
                     contract = PermissionController.createRequestPermissionResultContract()
                 ) { granted ->
@@ -102,6 +100,9 @@ class MainActivity : ComponentActivity() {
                     onRequestPermissions = {
                         val required = viewModel.getRequiredPermissions()
                         permissionLauncher.launch(required)
+                    },
+                    onManagePermissions = {
+                        openHealthConnectSettingsOrStore()
                     },
                     onOpenPlayStoreOrSettings = {
                         openHealthConnectSettingsOrStore()

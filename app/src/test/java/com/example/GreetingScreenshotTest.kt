@@ -48,6 +48,7 @@ class GreetingScreenshotTest {
           onRefresh = {},
           onSelectTab = {},
           onRequestPermissions = {},
+          onManagePermissions = {},
           onOpenPlayStoreOrSettings = {},
           onShowDataBoundaries = {},
           onChooseExportFolder = {},

@@ -79,6 +79,7 @@ enum class SdkAvailability {
 data class HealthUiState(
     val sdkAvailability: SdkAvailability = SdkAvailability.UNKNOWN,
     val grantedPermissions: Set<String> = emptySet(),
+    val requiredPermissionsGranted: Boolean = false,
     val isRefreshing: Boolean = false,
     val lastRefreshed: Instant? = null,
     val selectedTab: SelectedDayTab = SelectedDayTab.TODAY,

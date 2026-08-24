@@ -95,6 +95,7 @@ class HealthAvailabilityViewModel(
                     it.copy(
                         sdkAvailability = sdkStatus,
                         grantedPermissions = granted,
+                        requiredPermissionsGranted = granted.containsAll(repository.getRequiredPermissions()),
                         todayReport = todayReport,
                         yesterdayReport = yesterdayReport,
                         backgroundReadAvailable = repository.isBackgroundReadAvailable(),

@@ -83,6 +83,7 @@ fun HealthAvailabilityScreen(
     onRefresh: () -> Unit,
     onSelectTab: (SelectedDayTab) -> Unit,
     onRequestPermissions: () -> Unit,
+    onManagePermissions: () -> Unit,
     onOpenPlayStoreOrSettings: () -> Unit,
     onShowDataBoundaries: (Boolean) -> Unit,
     onChooseExportFolder: () -> Unit,
@@ -224,22 +225,40 @@ fun HealthAvailabilityScreen(
                         color = CleanTextSecondary
                     )
                     FilledTonalButton(
-                        onClick = onRequestPermissions,
+                        onClick = if (uiState.requiredPermissionsGranted) {
+                            onManagePermissions
+                        } else {
+                            onRequestPermissions
+                        },
                         modifier = Modifier.testTag("btn_request_permissions"),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = CleanContainer,
-                            contentColor = CleanTextPrimary
+                            contentColor = if (uiState.requiredPermissionsGranted) {
+                                CleanStatusAvailableText
+                            } else {
+                                CleanTextPrimary
+                            }
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Shield,
+                            imageVector = if (uiState.requiredPermissionsGranted) {
+                                Icons.Filled.CheckCircle
+                            } else {
+                                Icons.Filled.Shield
+                            },
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = stringResource(R.string.grant_permissions),
+                            text = stringResource(
+                                if (uiState.requiredPermissionsGranted) {
+                                    R.string.manage_permissions
+                                } else {
+                                    R.string.grant_permissions
+                                }
+                            ),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -674,6 +693,7 @@ fun HealthAvailabilityScreenPreview() {
             onRefresh = {},
             onSelectTab = {},
             onRequestPermissions = {},
+            onManagePermissions = {},
             onOpenPlayStoreOrSettings = {},
             onShowDataBoundaries = {},
             onChooseExportFolder = {},
