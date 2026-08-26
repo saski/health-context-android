@@ -204,7 +204,20 @@ class ComprehensiveHealthReader(
                     "Sin entrenamiento registrado en este día"
                 )
             } else {
-                sessions.sortedBy { it.startTime }.forEachIndexed { index, session ->
+                val reconciledSessions = ExerciseSessionReconciler.reconcile(
+                    sessions.map { session ->
+                        ExerciseSessionReconciler.Candidate(
+                            value = session,
+                            recordId = session.metadata.id,
+                            exerciseType = session.exerciseType,
+                            startTime = session.startTime,
+                            endTime = session.endTime,
+                            sourcePackage = session.metadata.dataOrigin.packageName
+                        )
+                    }
+                )
+                reconciledSessions.forEachIndexed { index, reconciled ->
+                    val session = reconciled.candidate.value
                     val duration = Duration.between(session.startTime, session.endTime)
                     val typeLabel = exerciseTypeLabel(session.exerciseType)
                     val extras = buildList {
@@ -220,11 +233,22 @@ class ComprehensiveHealthReader(
                         source = session.metadata.dataOrigin.packageName.ifBlank { "Health Connect" },
                         coverage = "${timeFormatter.format(session.startTime)} - ${timeFormatter.format(session.endTime)}",
                         observation = extras.joinToString("; "),
-                        reason = "Sesión de entrenamiento registrada"
+                        reason = if (reconciled.excludedDuplicateSources.isEmpty()) {
+                            "Sesión de entrenamiento registrada"
+                        } else {
+                            "Sesión de entrenamiento registrada; duplicado solapado de " +
+                                reconciled.excludedDuplicateSources.joinToString(", ") + " excluido"
+                        }
                     )
                 }
             }
         }
+        metrics += aggregate(
+            ExerciseSessionRecord::class,
+            ExerciseSessionRecord.EXERCISE_DURATION_TOTAL,
+            "exercise_duration_total",
+            "Duración de entrenamientos"
+        ) { formatDuration(it) }
         metrics += aggregate(
             SpeedRecord::class,
             SpeedRecord.SPEED_AVG,

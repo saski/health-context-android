@@ -381,11 +381,15 @@ object NightlyReviewGenerator {
                     )?.number(),
                     hrvRmssd = report.availableMetric(HealthDomain.RESTING_HEART_RATE, "hrv_rmssd")?.number(),
                     exerciseSessions = exerciseMetrics.filter { it.key.startsWith("exercise_session_") },
-                    trainingMinutes = exerciseMetrics
-                        .filter { it.key.startsWith("exercise_session_") }
-                        .mapNotNull { it.observation?.sleepMinutes() }
-                        .takeIf { it.isNotEmpty() }
-                        ?.sum(),
+                    trainingMinutes = report.availableMetric(
+                        HealthDomain.EXERCISE,
+                        "exercise_duration_total"
+                    )?.observation?.sleepMinutes()
+                        ?: exerciseMetrics
+                            .filter { it.key.startsWith("exercise_session_") }
+                            .mapNotNull { it.observation?.sleepMinutes() }
+                            .takeIf { it.isNotEmpty() }
+                            ?.sum(),
                     hasIsolatedExerciseMetrics = exerciseMetrics.any { !it.key.startsWith("exercise_session_") }
                 )
             }

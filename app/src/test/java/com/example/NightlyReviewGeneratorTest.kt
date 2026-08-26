@@ -48,6 +48,24 @@ class NightlyReviewGeneratorTest {
     }
 
     @Test
+    fun `uses Health Connect aggregated workout duration instead of summing mirrored sessions`() {
+        val today = report(
+            LocalDate.of(2026, 8, 24),
+            domain(
+                HealthDomain.EXERCISE,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("exercise_session_1", "Caminar", HealthAvailabilityStatus.AVAILABLE, "41 min"),
+                metric("exercise_duration_total", "Duración de entrenamientos", HealthAvailabilityStatus.AVAILABLE, "41 min")
+            )
+        )
+
+        val review = NightlyReviewGenerator.generate(today, Instant.parse("2026-08-24T20:30:00Z"))
+
+        assertTrue(review.facts.any { it.contains("1 sesión") && it.contains("41 min") })
+        assertFalse(review.facts.any { it.contains("82 min") })
+    }
+
+    @Test
     fun `uses a loaded feeling as context without making a diagnosis`() {
         val today = report(
             LocalDate.of(2026, 8, 24),

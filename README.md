@@ -18,8 +18,8 @@ today's or yesterday's information into six compact domains:
 
 - daily activity: steps, active and total calories, distance, elevation,
   floors and cadence;
-- workouts: every exercise session plus available speed, power and cycling
-  cadence summaries;
+- workouts: reconciled exercise sessions plus available speed, power and
+  cycling cadence summaries;
 - sleep: every session and its duration;
 - body: weight, body fat, water, bone and lean mass, height and basal metabolism;
 - nutrition: distinct food entries, populated nutrient totals and hydration;
@@ -59,6 +59,21 @@ Color communicates data state, not health quality:
 
 An unavailable value is never displayed as zero and does not imply inactivity,
 poor sleep, or another medical conclusion.
+
+### Avoiding duplicate activity
+
+More than one app can write the same walk or workout to Health Connect. The
+app treats only a near-identical overlap of the same exercise type from two
+different apps as one session. It preserves the chosen source and writes the
+excluded duplicate source into the daily Markdown reason. Concurrent workouts
+of a different type and merely adjacent sessions remain separate.
+
+For consistent daily totals, make Zepp/Amazfit the priority source once in the
+Health Connect app's data-management or app-priority settings for activity.
+Leave Google Fit and the phone enabled if they add data Zepp does not produce;
+the app's reconciliation protects the workout list, while Health Connect's own
+priority controls its aggregated activity totals. The companion app never
+deletes or changes any Health Connect record.
 
 ## Privacy boundary
 
@@ -115,9 +130,9 @@ both the dated archive `health-context-YYYY-MM-DD.md` and the stable
 The review is deterministic: it uses no AI, network service, diagnosis, or
 automatic training prescription. A personal comparison requires enough
 comparable observations in both periods. Workout count and total duration use
-actual exercise-session records only; isolated speed, cadence, or power cannot
-create a workout. A recorded feeling is subjective context, never a clinical
-measurement.
+reconciled exercise-session records and Health Connect's priority-aware daily
+duration when available; isolated speed, cadence, or power cannot create a
+workout. A recorded feeling is subjective context, never a clinical measurement.
 
 **Review now** runs the same path for initial verification or recovery; it is
 not intended as a daily requirement.
