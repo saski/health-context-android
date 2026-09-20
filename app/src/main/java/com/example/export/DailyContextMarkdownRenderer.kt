@@ -2,6 +2,7 @@ package com.example.export
 
 import com.example.data.model.DayAvailabilityReport
 import com.example.data.model.HealthAvailabilityStatus
+import com.example.data.model.HealthSourceNames
 import com.example.review.NightlyReview
 import com.example.review.NightlyReviewGenerator
 import java.time.Instant
@@ -44,12 +45,18 @@ object DailyContextMarkdownRenderer {
         appendLine("### Confidence note")
         appendLine(review.gaps.firstOrNull() ?: "No additional confidence limitation is present in this snapshot.")
         report.domains.forEach { domain ->
+            val sourcePackages = (
+                HealthSourceNames.packageIds(domain.source) + domain.sourcePackages
+                ).distinct()
             appendLine()
             appendLine("## ${domain.domain.labelEs}")
             appendLine("- status: ${domain.status.name.lowercase()}")
-            appendLine("- source: ${domain.source}")
+            appendLine("- source: ${HealthSourceNames.display(domain.source)}")
+            if (sourcePackages.isNotEmpty()) {
+                appendLine("- source_packages: ${sourcePackages.joinToString(", ")}")
+            }
             appendLine("- coverage: ${domain.coveredThrough}")
-            appendLine("- reason: ${domain.reason}")
+            appendLine("- reason: ${HealthSourceNames.replacePackageIds(domain.reason)}")
             domain.metricSummary?.let { appendLine("- observation: $it") }
             if (domain.status != HealthAvailabilityStatus.AVAILABLE) {
                 appendLine("- gap: unavailable; no value is inferred as zero")
@@ -59,9 +66,9 @@ object DailyContextMarkdownRenderer {
                 appendLine("### ${metric.label}")
                 appendLine("- key: ${metric.key}")
                 appendLine("- status: ${metric.status.name.lowercase()}")
-                appendLine("- source: ${metric.source}")
+                appendLine("- source: ${HealthSourceNames.display(metric.source)}")
                 appendLine("- coverage: ${metric.coveredThrough}")
-                appendLine("- reason: ${metric.reason}")
+                appendLine("- reason: ${HealthSourceNames.replacePackageIds(metric.reason)}")
                 metric.observation?.let { appendLine("- observation: $it") }
                 if (metric.status != HealthAvailabilityStatus.AVAILABLE) {
                     appendLine("- gap: unavailable; no value is inferred as zero")

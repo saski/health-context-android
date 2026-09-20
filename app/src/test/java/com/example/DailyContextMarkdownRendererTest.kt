@@ -8,6 +8,7 @@ import com.example.data.model.MetricAvailability
 import com.example.export.DailyContextMarkdownRenderer
 import com.example.export.DailyContextArtifacts
 import com.example.export.SnapshotStage
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -125,7 +126,8 @@ class DailyContextMarkdownRendererTest {
 
         assertTrue(markdown.contains("schema: health-context/v2"))
         assertTrue(markdown.contains("### Elíptica"))
-        assertTrue(markdown.contains("source: com.google.android.apps.fitness"))
+        assertTrue(markdown.contains("source: Google Fit"))
+        assertTrue(markdown.contains("source_packages: com.google.android.apps.fitness"))
         assertTrue(markdown.contains("observation: 30 min"))
         assertFalse(markdown.contains("latitude"))
         assertFalse(markdown.contains("longitude"))
@@ -148,7 +150,7 @@ class DailyContextMarkdownRendererTest {
                 DomainAvailability(
                     domain = HealthDomain.EXERCISE,
                     status = HealthAvailabilityStatus.AVAILABLE,
-                    source = "com.huami.watch.hmwatchmanager",
+                    source = "com.huami.watch.hmwatchmanager, com.huami.watch.hmwatchmanager, com.google.android.apps.fitness",
                     coveredThrough = "14:45 - 15:15",
                     reason = "1 entrenamiento registrado",
                     metrics = listOf(
@@ -158,7 +160,7 @@ class DailyContextMarkdownRendererTest {
                             status = HealthAvailabilityStatus.AVAILABLE,
                             source = "com.huami.watch.hmwatchmanager",
                             coveredThrough = "14:45 - 15:15",
-                            reason = "Sesión de entrenamiento registrada",
+                            reason = "Sesión de entrenamiento registrada; duplicado solapado de com.google.android.apps.fitness excluido",
                             observation = "30 min"
                         )
                     )
@@ -177,6 +179,20 @@ class DailyContextMarkdownRendererTest {
                 "Entrenamiento registrado: 1 sesión y 30 min en total (Entrenamiento de fuerza)."
             )
         )
-        assertTrue(retrievalPrefix.contains("source: com.huami.watch.hmwatchmanager"))
+        assertTrue(retrievalPrefix.contains("source: Zepp / Amazfit, Google Fit"))
+        assertTrue(
+            retrievalPrefix.contains(
+                "source_packages: com.huami.watch.hmwatchmanager, com.google.android.apps.fitness"
+            )
+        )
+        assertTrue(retrievalPrefix.contains("duplicado solapado de Google Fit excluido"))
+        assertEquals(
+            1,
+            Regex("com\\.huami\\.watch\\.hmwatchmanager").findAll(retrievalPrefix).count()
+        )
+        assertEquals(
+            1,
+            Regex("com\\.google\\.android\\.apps\\.fitness").findAll(retrievalPrefix).count()
+        )
     }
 }
