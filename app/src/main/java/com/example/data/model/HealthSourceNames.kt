@@ -19,6 +19,12 @@ object HealthSourceNames {
         .filter { it.matches(packagePattern) }
         .distinct()
 
+    fun packageIdsInText(text: String): List<String> = packagePattern
+        .findAll(text)
+        .map { it.value }
+        .distinct()
+        .toList()
+
     fun replacePackageIds(text: String): String = packageNames.entries.fold(text) { result, (packageName, label) ->
         result.replace(packageName, label)
     }

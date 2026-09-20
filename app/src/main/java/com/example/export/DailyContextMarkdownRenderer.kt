@@ -2,6 +2,7 @@ package com.example.export
 
 import com.example.data.model.DayAvailabilityReport
 import com.example.data.model.HealthAvailabilityStatus
+import com.example.data.model.HealthDomain
 import com.example.data.model.HealthSourceNames
 import com.example.review.NightlyReview
 import com.example.review.NightlyReviewGenerator
@@ -48,6 +49,9 @@ object DailyContextMarkdownRenderer {
             val sourcePackages = (
                 HealthSourceNames.packageIds(domain.source) + domain.sourcePackages
                 ).distinct()
+            val exerciseSessions = domain.metrics.filter {
+                domain.domain == HealthDomain.EXERCISE && it.key.startsWith("exercise_session_")
+            }
             appendLine()
             appendLine("## ${domain.domain.labelEs}")
             appendLine("- status: ${domain.status.name.lowercase()}")
@@ -58,17 +62,39 @@ object DailyContextMarkdownRenderer {
             appendLine("- coverage: ${domain.coveredThrough}")
             appendLine("- reason: ${HealthSourceNames.replacePackageIds(domain.reason)}")
             domain.metricSummary?.let { appendLine("- observation: $it") }
+            if (exerciseSessions.isNotEmpty()) {
+                val sessionSources = exerciseSessions
+                    .map { HealthSourceNames.display(it.source) }
+                    .distinct()
+                appendLine("- session_source: ${sessionSources.joinToString(", ")}")
+                val excludedSources = exerciseSessions
+                    .flatMap { HealthSourceNames.packageIdsInText(it.reason) }
+                    .map(HealthSourceNames::display)
+                    .distinct()
+                if (excludedSources.isNotEmpty()) {
+                    appendLine(
+                        "- reconciliation: overlapping copies from " +
+                            "${excludedSources.joinToString(", ")} were excluded"
+                    )
+                }
+            }
             if (domain.status != HealthAvailabilityStatus.AVAILABLE) {
                 appendLine("- gap: unavailable; no value is inferred as zero")
             }
             domain.metrics.forEach { metric ->
+                val isExerciseSession = domain.domain == HealthDomain.EXERCISE &&
+                    metric.key.startsWith("exercise_session_")
                 appendLine()
                 appendLine("### ${metric.label}")
                 appendLine("- key: ${metric.key}")
                 appendLine("- status: ${metric.status.name.lowercase()}")
-                appendLine("- source: ${HealthSourceNames.display(metric.source)}")
+                if (!isExerciseSession) {
+                    appendLine("- source: ${HealthSourceNames.display(metric.source)}")
+                }
                 appendLine("- coverage: ${metric.coveredThrough}")
-                appendLine("- reason: ${HealthSourceNames.replacePackageIds(metric.reason)}")
+                if (!isExerciseSession) {
+                    appendLine("- reason: ${HealthSourceNames.replacePackageIds(metric.reason)}")
+                }
                 metric.observation?.let { appendLine("- observation: $it") }
                 if (metric.status != HealthAvailabilityStatus.AVAILABLE) {
                     appendLine("- gap: unavailable; no value is inferred as zero")

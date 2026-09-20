@@ -185,7 +185,11 @@ class DailyContextMarkdownRendererTest {
                 "source_packages: com.huami.watch.hmwatchmanager, com.google.android.apps.fitness"
             )
         )
-        assertTrue(retrievalPrefix.contains("duplicado solapado de Google Fit excluido"))
+        assertTrue(retrievalPrefix.contains("session_source: Zepp / Amazfit"))
+        assertTrue(retrievalPrefix.contains("overlapping copies from Google Fit were excluded"))
+        val workoutEntry = retrievalPrefix.substringAfter("### Entrenamiento de fuerza")
+        assertFalse(workoutEntry.contains("- source: Zepp / Amazfit"))
+        assertFalse(workoutEntry.contains("duplicado solapado"))
         assertEquals(
             1,
             Regex("com\\.huami\\.watch\\.hmwatchmanager").findAll(retrievalPrefix).count()
