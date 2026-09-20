@@ -183,14 +183,14 @@ class HealthAvailabilityViewModel(
         if (nightlyWasEnabled) {
             nightlyReviewScheduler.disable()
             nightlyReviewStore.setEnabled(false)
-            nightlyReviewStore.recordStatus("Revisión nocturna pausada junto con la exportación diaria")
+            nightlyReviewStore.recordStatus("Revisión diaria pausada junto con la sincronización")
         }
         _uiState.update {
             it.copy(
                 automaticExportEnabled = false,
                 automaticExportStatus = "Exportación automática pausada",
                 nightlyReviewEnabled = if (nightlyWasEnabled) false else it.nightlyReviewEnabled,
-                nightlyReviewStatus = if (nightlyWasEnabled) "Revisión nocturna pausada junto con la exportación diaria" else it.nightlyReviewStatus,
+                nightlyReviewStatus = if (nightlyWasEnabled) "Revisión diaria pausada junto con la sincronización" else it.nightlyReviewStatus,
                 errorMessage = null
             )
         }
@@ -199,13 +199,13 @@ class HealthAvailabilityViewModel(
     fun handleNightlyBackgroundPermissionResult(granted: Boolean) {
         _uiState.update { it.copy(backgroundReadPermissionGranted = granted) }
         if (!granted) {
-            _uiState.update { it.copy(errorMessage = "La revisión nocturna necesita lectura de Health Connect en segundo plano") }
+            _uiState.update { it.copy(errorMessage = "La revisión diaria necesita lectura de Health Connect en segundo plano") }
         }
     }
 
     fun handleNotificationPermissionResult(granted: Boolean) {
         if (!granted) {
-            _uiState.update { it.copy(errorMessage = "Concede notificaciones para recibir la revisión nocturna") }
+            _uiState.update { it.copy(errorMessage = "Concede notificaciones para recibir la revisión diaria") }
         }
     }
 
@@ -219,14 +219,14 @@ class HealthAvailabilityViewModel(
                 _uiState.update { it.copy(errorMessage = "Este dispositivo no ofrece lectura de Health Connect en segundo plano") }
             }
             !state.backgroundReadPermissionGranted -> {
-                _uiState.update { it.copy(errorMessage = "Concede la lectura en segundo plano para activar la revisión nocturna") }
+                _uiState.update { it.copy(errorMessage = "Concede la lectura en segundo plano para activar la revisión diaria") }
             }
             else -> {
                 exportRepository.setAutomaticExportEnabled(true)
                 exportScheduler.enable()
                 nightlyReviewStore.setEnabled(true)
                 nightlyReviewScheduler.enable()
-                val status = "Revisión nocturna activa: se preparará aproximadamente a las 22:30"
+                val status = "Revisión diaria activa: llegará alrededor de las 09:00 con los datos de ayer"
                 nightlyReviewStore.recordStatus(status)
                 _uiState.update {
                     it.copy(
@@ -244,7 +244,7 @@ class HealthAvailabilityViewModel(
     fun disableNightlyReview() {
         nightlyReviewScheduler.disable()
         nightlyReviewStore.setEnabled(false)
-        val status = "Revisión nocturna pausada"
+        val status = "Revisión diaria pausada"
         nightlyReviewStore.recordStatus(status)
         _uiState.update {
             it.copy(nightlyReviewEnabled = false, nightlyReviewStatus = status, errorMessage = null)
@@ -274,8 +274,8 @@ class HealthAvailabilityViewModel(
                 clock = clock,
                 zoneId = zoneId
             ).run()
-            result.onSuccess { fileName ->
-                val status = "Revisión generada y exportada: $fileName"
+            result.onSuccess {
+                val status = "Revisión de ayer actualizada"
                 nightlyReviewStore.recordStatus(status)
                 val review = nightlyReviewStore.latest()
                 _uiState.update {
@@ -305,7 +305,7 @@ class HealthAvailabilityViewModel(
     fun openNightlyReview(date: LocalDate?) {
         val review = nightlyReviewStore.latest()
         if (review == null) {
-            _uiState.update { it.copy(errorMessage = "Todavía no hay una revisión nocturna guardada") }
+            _uiState.update { it.copy(errorMessage = "Todavía no hay una revisión diaria guardada") }
             return
         }
         if (date != null && review.date != date) {
@@ -333,6 +333,39 @@ class HealthAvailabilityViewModel(
         val review = _uiState.value.latestNightlyReview ?: return
         nightlyReviewStore.recordFeeling(review.date, feeling)
         _uiState.update { it.copy(nightlyFeeling = feeling) }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val report = listOfNotNull(_uiState.value.yesterdayReport, _uiState.value.todayReport)
+                    .firstOrNull { it.date == review.date }
+                    ?: repository.loadDayAvailability(review.date, zoneId)
+                val generatedAt = clock.instant()
+                val recentReports = repository.loadRecentReports(report.date, zoneId)
+                val updatedReview = NightlyReviewGenerator.generate(
+                    report = report,
+                    generatedAt = generatedAt,
+                    recentReports = recentReports,
+                    feeling = feeling
+                )
+                nightlyReviewStore.save(updatedReview)
+                exportRepository.export(report, generatedAt, updatedReview, SnapshotStage.FINAL).getOrThrow()
+                updatedReview
+            }.onSuccess { updatedReview ->
+                _uiState.update {
+                    it.copy(
+                        latestNightlyReview = updatedReview,
+                        nightlyFeeling = feeling,
+                        errorMessage = null
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        nightlyFeeling = feeling,
+                        errorMessage = "Guardé tu respuesta, pero no pude actualizar la revisión: ${error.localizedMessage ?: "error desconocido"}"
+                    )
+                }
+            }
+        }
     }
 
     fun exportSelectedDay() {

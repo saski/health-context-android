@@ -1,12 +1,15 @@
 package com.example
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import com.example.data.model.HealthUiState
 import com.example.data.model.SdkAvailability
 import com.example.data.repository.FakeHealthConnectRepository
 import com.example.ui.HealthAvailabilityScreen
 import com.example.ui.theme.MyApplicationTheme
+import com.example.review.NightlyReview
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
 import kotlinx.coroutines.runBlocking
@@ -64,5 +67,46 @@ class GreetingScreenshotTest {
     }
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
+  }
+
+  @Test
+  fun latest_coaching_review_is_primary_even_before_raw_reports_load() {
+    val review = NightlyReview(
+      date = LocalDate.of(2026, 8, 24),
+      generatedAt = Instant.parse("2026-08-25T07:00:00Z"),
+      summary = "Ayer entrenaste con menos sueño de lo habitual.",
+      facts = listOf("El descanso quedó corto frente a tu referencia reciente."),
+      gaps = emptyList(),
+      nextActions = listOf("Hoy elige yoga, movilidad o un paseo suave."),
+      checkInPrompt = "¿Cómo notas hoy la recuperación?"
+    )
+
+    composeTestRule.setContent {
+      MyApplicationTheme {
+        HealthAvailabilityScreen(
+          uiState = HealthUiState(
+            sdkAvailability = SdkAvailability.AVAILABLE,
+            latestNightlyReview = review
+          ),
+          onRefresh = {},
+          onSelectTab = {},
+          onRequestPermissions = {},
+          onManagePermissions = {},
+          onOpenPlayStoreOrSettings = {},
+          onShowDataBoundaries = {},
+          onChooseExportFolder = {},
+          onExport = {},
+          onToggleAutomaticExport = {},
+          onToggleNightlyReview = {},
+          onGenerateNightlyReviewNow = {},
+          onShowNightlyReview = {},
+          onNightlyReviewFeedback = {}
+        )
+      }
+    }
+
+    composeTestRule.onNodeWithText(review.summary).assertIsDisplayed()
+    composeTestRule.onNodeWithText("PARA HOY").assertIsDisplayed()
+    composeTestRule.onNodeWithText(review.checkInPrompt).assertIsDisplayed()
   }
 }

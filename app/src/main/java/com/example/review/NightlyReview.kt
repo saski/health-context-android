@@ -9,7 +9,8 @@ data class NightlyReview(
     val summary: String,
     val facts: List<String>,
     val gaps: List<String>,
-    val nextActions: List<String>
+    val nextActions: List<String>,
+    val checkInPrompt: String = "¿Cómo te encuentras hoy?"
 ) {
     fun renderPlainText(): String = buildList {
         add(summary)

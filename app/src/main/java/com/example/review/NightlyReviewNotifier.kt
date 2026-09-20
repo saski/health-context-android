@@ -36,33 +36,19 @@ class AndroidNightlyReviewNotifier(private val context: Context) : NightlyReview
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_nightly_review_notification)
-            .setContentTitle("Revisión de hoy")
+            .setContentTitle("Tu revisión de ayer")
             .setContentText(review.summary)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(review.summary))
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    listOfNotNull(review.summary, review.nextActions.firstOrNull()).joinToString("\n\n")
+                )
+            )
             .setContentIntent(pendingIntent)
-            .addAction(feelingAction(review, NightlyFeeling.GOOD, "Bien"))
-            .addAction(feelingAction(review, NightlyFeeling.LOADED, "Cargado"))
-            .addAction(feelingAction(review, NightlyFeeling.UNWELL, "Mal"))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
-    }
-
-    private fun feelingAction(
-        review: NightlyReview,
-        feeling: NightlyFeeling,
-        label: String
-    ): NotificationCompat.Action {
-        val intent = NightlyFeelingReceiver.intent(context, review.date, feeling)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            31 * review.date.hashCode() + feeling.ordinal,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        return NotificationCompat.Action.Builder(0, label, pendingIntent).build()
     }
 
     private fun canNotify(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -74,10 +60,10 @@ class AndroidNightlyReviewNotifier(private val context: Context) : NightlyReview
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Revisión nocturna de salud",
+                "Revisión diaria de salud",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Interpretación diaria generada desde Health Connect"
+                description = "Revisión de ayer y recomendación para hoy"
             }
         )
     }

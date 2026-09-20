@@ -17,11 +17,11 @@ class NightlyReviewTask(
 ) {
     suspend fun run(): Result<String> = runCatching {
         val generatedAt = clock.instant()
-        val date = LocalDate.now(clock.withZone(zoneId))
+        val date = LocalDate.now(clock.withZone(zoneId)).minusDays(1)
         val report = healthRepository.loadDayAvailability(date, zoneId)
         val recentReports = healthRepository.loadRecentReports(date, zoneId)
         val review = NightlyReviewGenerator.generate(report, generatedAt, recentReports)
-        val fileName = writer.export(report, generatedAt, review, SnapshotStage.PROVISIONAL).getOrThrow()
+        val fileName = writer.export(report, generatedAt, review, SnapshotStage.FINAL).getOrThrow()
         store.save(review)
         notifier.notify(review)
         fileName

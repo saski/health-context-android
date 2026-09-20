@@ -123,6 +123,7 @@ fun HealthAvailabilityScreen(
         DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()).withZone(zoneId)
     }
     var setupExpanded by rememberSaveable { mutableStateOf(false) }
+    var showSupportingData by rememberSaveable { mutableStateOf(false) }
     val automationHealth = AutomationHealth.evaluate(
         uiState.automaticExportEnabled,
         uiState.nightlyReviewEnabled,
@@ -235,75 +236,70 @@ fun HealthAvailabilityScreen(
                 }
             }
 
-            // Overall Summary Card
             val currentReport = if (uiState.selectedTab == SelectedDayTab.TODAY) {
                 uiState.todayReport
             } else {
                 uiState.yesterdayReport
             }
 
-            if (currentReport != null) {
+            if (latestReview != null) {
                 item {
-                    CleanDayNavigation(
-                        selectedTab = uiState.selectedTab,
-                        onSelectTab = onSelectTab
+                    LatestReviewSummaryCard(
+                        review = latestReview,
+                        feeling = uiState.nightlyFeeling,
+                        onFeeling = onNightlyFeeling,
+                        onOpen = { onShowNightlyReview(true) }
                     )
                 }
+            } else {
+                item { AwaitingMorningReviewCard() }
+            }
 
-                uiState.latestNightlyReview?.let { review ->
+            if (currentReport != null) {
+                item {
+                    FilledTonalButton(
+                        onClick = { showSupportingData = !showSupportingData },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (showSupportingData) "Ocultar datos de respaldo" else "Ver datos de respaldo")
+                    }
+                }
+
+                if (showSupportingData) {
                     item {
-                        LatestReviewSummaryCard(
-                            review = review,
-                            onOpen = { onShowNightlyReview(true) }
+                        CleanDayNavigation(
+                            selectedTab = uiState.selectedTab,
+                            onSelectTab = onSelectTab
+                        )
+                    }
+
+                    item {
+                        val timestampStr = uiState.lastRefreshed?.let {
+                            val dayLabel = if (uiState.selectedTab == SelectedDayTab.TODAY) "Hoy" else "Ayer"
+                            "$dayLabel, ${timeFormatter.format(it)}"
+                        }
+                        OverallStatusCard(
+                            report = currentReport,
+                            timestampText = timestampStr
+                        )
+                    }
+
+                    items(
+                        items = currentReport.domains,
+                        key = { it.domain.name }
+                    ) { domainAvailability ->
+                        HealthDomainCard(
+                            availability = domainAvailability,
+                            onOpenSource = domainAvailability.sourcePackages
+                                .takeIf {
+                                    it.isNotEmpty() && domainAvailability.status != HealthAvailabilityStatus.UNAVAILABLE &&
+                                        domainAvailability.status != HealthAvailabilityStatus.PERMISSION_NEEDED
+                                }
+                                ?.let { packages -> { onOpenDomainSource(packages) } }
                         )
                     }
                 }
-
-                item {
-                    val timestampStr = uiState.lastRefreshed?.let {
-                        val dayLabel = if (uiState.selectedTab == SelectedDayTab.TODAY) "Hoy" else "Ayer"
-                        "$dayLabel, ${timeFormatter.format(it)}"
-                    }
-                    OverallStatusCard(
-                        report = currentReport,
-                        timestampText = timestampStr
-                    )
-                }
-
-                // 5 Domain Cards
-                items(
-                    items = currentReport.domains,
-                    key = { it.domain.name }
-                ) { domainAvailability ->
-                    HealthDomainCard(
-                        availability = domainAvailability,
-                        onOpenSource = domainAvailability.sourcePackages
-                            .takeIf {
-                                it.isNotEmpty() && domainAvailability.status != HealthAvailabilityStatus.UNAVAILABLE &&
-                                    domainAvailability.status != HealthAvailabilityStatus.PERMISSION_NEEDED
-                            }
-                            ?.let { packages -> { onOpenDomainSource(packages) } }
-                    )
-                }
-
-                item {
-                    AutomationSetupCard(
-                        state = automationHealth,
-                        expanded = setupExpanded,
-                        uiState = uiState,
-                        zoneId = zoneId,
-                        onToggleExpanded = { setupExpanded = !setupExpanded },
-                        onRequestPermissions = onRequestPermissions,
-                        onManagePermissions = onManagePermissions,
-                        onChooseExportFolder = onChooseExportFolder,
-                        onToggleAutomaticExport = onToggleAutomaticExport,
-                        onExport = onExport,
-                        onToggleNightlyReview = onToggleNightlyReview,
-                        onGenerateNightlyReviewNow = onGenerateNightlyReviewNow,
-                        onShowNightlyReview = { onShowNightlyReview(true) }
-                    )
-                }
-            } else if (!uiState.isRefreshing) {
+            } else if (!uiState.isRefreshing && latestReview == null) {
                 item {
                     FilledTonalButton(
                         onClick = if (uiState.requiredPermissionsGranted) onManagePermissions else onRequestPermissions,
@@ -319,6 +315,24 @@ fun HealthAvailabilityScreen(
                         onRequestPermissions = onRequestPermissions
                     )
                 }
+            }
+
+            item {
+                AutomationSetupCard(
+                    state = automationHealth,
+                    expanded = setupExpanded,
+                    uiState = uiState,
+                    zoneId = zoneId,
+                    onToggleExpanded = { setupExpanded = !setupExpanded },
+                    onRequestPermissions = onRequestPermissions,
+                    onManagePermissions = onManagePermissions,
+                    onChooseExportFolder = onChooseExportFolder,
+                    onToggleAutomaticExport = onToggleAutomaticExport,
+                    onExport = onExport,
+                    onToggleNightlyReview = onToggleNightlyReview,
+                    onGenerateNightlyReviewNow = onGenerateNightlyReviewNow,
+                    onShowNightlyReview = { onShowNightlyReview(true) }
+                )
             }
 
             // Footer info box
@@ -338,6 +352,8 @@ fun HealthAvailabilityScreen(
 @Composable
 private fun LatestReviewSummaryCard(
     review: NightlyReview,
+    feeling: NightlyFeeling?,
+    onFeeling: (NightlyFeeling) -> Unit,
     onOpen: () -> Unit
 ) {
     Card(
@@ -345,13 +361,72 @@ private fun LatestReviewSummaryCard(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Revisión del ${review.date}", fontSize = 11.sp, color = CleanTextSecondary)
-            Text(review.summary, fontWeight = FontWeight.SemiBold, color = CleanTextPrimary)
-            review.nextActions.firstOrNull()?.let { action ->
-                Text("Para mañana · $action", style = MaterialTheme.typography.bodySmall, color = CleanStatusAvailableText)
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("TU REVISIÓN DE AYER · ${review.date}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CleanStatusAvailableText)
+            Text(
+                review.summary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = CleanTextPrimary
+            )
+            review.facts.firstOrNull()?.let { message ->
+                Text(message, style = MaterialTheme.typography.bodyMedium, color = CleanTextPrimary)
             }
-            Text("Ver revisión completa", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            review.nextActions.firstOrNull()?.let { action ->
+                Surface(color = CleanSurface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("PARA HOY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = CleanStatusAvailableText)
+                        Text(action, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+            Text(review.checkInPrompt, fontWeight = FontWeight.SemiBold, color = CleanTextPrimary)
+            CoachFeelingButtons(feeling = feeling, onFeeling = onFeeling)
+            Text("Ver contexto de la recomendación", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun AwaitingMorningReviewCard() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CleanPrimaryContainer),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("TU COACH DE SALUD", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CleanStatusAvailableText)
+            Text("La primera revisión llegará por la mañana", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Alrededor de las 09:00 interpretaré el día anterior junto con tu evolución reciente y te propondré una acción para hoy.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = CleanTextSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoachFeelingButtons(
+    feeling: NightlyFeeling?,
+    onFeeling: (NightlyFeeling) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        NightlyFeeling.entries.forEach { option ->
+            FilledTonalButton(
+                onClick = { onFeeling(option) },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 6.dp)
+            ) {
+                Text(
+                    when (option) {
+                        NightlyFeeling.GOOD -> if (feeling == option) "Bien ✓" else "Bien"
+                        NightlyFeeling.LOADED -> if (feeling == option) "Cargado ✓" else "Cargado"
+                        NightlyFeeling.UNWELL -> if (feeling == option) "Mal ✓" else "Mal"
+                    },
+                    fontSize = 12.sp
+                )
+            }
         }
     }
 }
@@ -373,14 +448,14 @@ private fun AutomationSetupCard(
     onShowNightlyReview: () -> Unit
 ) {
     val label = when (state) {
-        AutomationHealthState.READY -> "Automatización lista"
-        AutomationHealthState.ATTENTION_REQUIRED -> "Automatización necesita atención"
-        AutomationHealthState.PAUSED -> "Automatización pausada"
+        AutomationHealthState.READY -> "Revisión diaria activa"
+        AutomationHealthState.ATTENTION_REQUIRED -> "La revisión necesita atención"
+        AutomationHealthState.PAUSED -> "Revisión diaria pausada"
     }
     val detail = when (state) {
-        AutomationHealthState.READY -> "Revisión nocturna y corrección matinal activas"
+        AutomationHealthState.READY -> "Recibirás la lectura de ayer alrededor de las 09:00"
         AutomationHealthState.ATTENTION_REQUIRED -> "Abre la configuración para corregir el acceso"
-        AutomationHealthState.PAUSED -> "Actívala una vez para olvidarte del proceso diario"
+        AutomationHealthState.PAUSED -> "Actívala para recibir una recomendación cada mañana"
     }
     val containerColor = when (state) {
         AutomationHealthState.READY -> com.example.ui.theme.CleanStatusAvailableBg
@@ -471,9 +546,9 @@ private fun NightlyReviewControls(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Revisión nocturna", fontWeight = FontWeight.Bold, color = CleanTextPrimary)
+            Text("Revisión diaria", fontWeight = FontWeight.Bold, color = CleanTextPrimary)
             Text(
-                if (enabled) "Activa · aproximadamente a las 22:30" else "Resumen factual y dos posibles acciones para mañana",
+                if (enabled) "Activa · alrededor de las 09:00 con el día anterior" else "Una lectura breve de ayer y una recomendación para hoy",
                 style = MaterialTheme.typography.bodySmall,
                 color = CleanTextSecondary
             )
@@ -486,12 +561,12 @@ private fun NightlyReviewControls(
                     enabled = ready && !running,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(if (running) "Revisando…" else "Revisar ahora")
+                    Text(if (running) "Revisando…" else "Actualizar revisión")
                 }
             }
             if (hasReview) {
                 FilledTonalButton(onClick = onOpenLatest, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ver última revisión")
+                    Text("Abrir revisión")
                 }
             }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = CleanTextSecondary) }
@@ -517,7 +592,7 @@ private fun NightlyReviewScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Revisión del día", fontWeight = FontWeight.SemiBold)
+                        Text("Tu revisión de ayer", fontWeight = FontWeight.SemiBold)
                         Text(review.date.toString(), fontSize = 11.sp, color = CleanTextSecondary)
                     }
                 },
@@ -548,9 +623,16 @@ private fun NightlyReviewScreen(
                     )
                 }
             }
-            item { ReviewSection("Qué significa", review.facts, CleanStatusAvailableText) }
-            item { ReviewSection("Evolución y confianza", review.gaps, CleanTextSecondary) }
-            item { ReviewSection("Sugerencias", review.nextActions, MaterialTheme.colorScheme.primary) }
+            item {
+                review.facts.firstOrNull()?.let { message ->
+                    CoachTextCard("La lectura del coach", message, CleanStatusAvailableText)
+                }
+            }
+            item {
+                review.nextActions.firstOrNull()?.let { action ->
+                    CoachTextCard("Para hoy", action, MaterialTheme.colorScheme.primary)
+                }
+            }
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CleanSurface),
@@ -558,32 +640,18 @@ private fun NightlyReviewScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("¿Cómo te sentías?", fontWeight = FontWeight.Bold)
+                        Text(review.checkInPrompt, fontWeight = FontWeight.Bold)
                         Text(
-                            "Una señal subjetiva para interpretar mejor mañana.",
+                            "Tu respuesta ajusta la recomendación usando los mismos datos.",
                             style = MaterialTheme.typography.bodySmall,
                             color = CleanTextSecondary
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            NightlyFeeling.entries.forEach { option ->
-                                FilledTonalButton(
-                                    onClick = { onFeeling(option) },
-                                    modifier = Modifier.weight(1f),
-                                    contentPadding = PaddingValues(horizontal = 6.dp)
-                                ) {
-                                    Text(
-                                        when (option) {
-                                            NightlyFeeling.GOOD -> if (feeling == option) "Bien ✓" else "Bien"
-                                            NightlyFeeling.LOADED -> if (feeling == option) "Cargado ✓" else "Cargado"
-                                            NightlyFeeling.UNWELL -> if (feeling == option) "Mal ✓" else "Mal"
-                                        },
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-                        }
+                        CoachFeelingButtons(feeling = feeling, onFeeling = onFeeling)
                     }
                 }
+            }
+            review.gaps.firstOrNull()?.let { limit ->
+                item { CoachTextCard("Qué limita esta lectura", limit, CleanTextSecondary) }
             }
             item {
                 Card(
@@ -620,7 +688,7 @@ private fun NightlyReviewScreen(
 }
 
 @Composable
-private fun ReviewSection(title: String, items: List<String>, accent: Color) {
+private fun CoachTextCard(title: String, text: String, accent: Color) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CleanSurface),
         shape = RoundedCornerShape(16.dp),
@@ -628,11 +696,7 @@ private fun ReviewSection(title: String, items: List<String>, accent: Color) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = accent)
-            if (items.isEmpty()) {
-                Text("Nada que señalar con este snapshot.", style = MaterialTheme.typography.bodyMedium, color = CleanTextSecondary)
-            } else {
-                items.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, color = CleanTextPrimary) }
-            }
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = CleanTextPrimary)
         }
     }
 }

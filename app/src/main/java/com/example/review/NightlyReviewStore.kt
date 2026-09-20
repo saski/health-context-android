@@ -34,7 +34,9 @@ class SharedPreferencesNightlyReviewStore(context: Context) : NightlyReviewStore
             summary = preferences.getString(LATEST_SUMMARY_KEY, null) ?: return null,
             facts = decode(preferences.getString(LATEST_FACTS_KEY, null)),
             gaps = decode(preferences.getString(LATEST_GAPS_KEY, null)),
-            nextActions = decode(preferences.getString(LATEST_ACTIONS_KEY, null))
+            nextActions = decode(preferences.getString(LATEST_ACTIONS_KEY, null)),
+            checkInPrompt = preferences.getString(LATEST_CHECK_IN_PROMPT_KEY, null)
+                ?: "¿Cómo te encuentras hoy?"
         )
     }.getOrNull()
 
@@ -46,6 +48,7 @@ class SharedPreferencesNightlyReviewStore(context: Context) : NightlyReviewStore
             .putString(LATEST_FACTS_KEY, encode(review.facts))
             .putString(LATEST_GAPS_KEY, encode(review.gaps))
             .putString(LATEST_ACTIONS_KEY, encode(review.nextActions))
+            .putString(LATEST_CHECK_IN_PROMPT_KEY, review.checkInPrompt)
             .apply()
     }
 
@@ -88,6 +91,7 @@ class SharedPreferencesNightlyReviewStore(context: Context) : NightlyReviewStore
         private const val LATEST_FACTS_KEY = "latest_facts"
         private const val LATEST_GAPS_KEY = "latest_gaps"
         private const val LATEST_ACTIONS_KEY = "latest_actions"
+        private const val LATEST_CHECK_IN_PROMPT_KEY = "latest_check_in_prompt"
         private const val FEEDBACK_PREFIX = "feedback_"
         private const val FEELING_PREFIX = "feeling_"
         private const val SEPARATOR = "\u001F"

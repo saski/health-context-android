@@ -8,6 +8,7 @@ import com.example.data.model.MetricAvailability
 import com.example.review.NightlyReviewGenerator
 import com.example.review.NightlyFeeling
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -15,6 +16,98 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class NightlyReviewGeneratorTest {
+    @Test
+    fun `writes one concise coaching message from activity sleep and nutrition`() {
+        val yesterday = report(
+            LocalDate.of(2026, 8, 24),
+            domain(
+                HealthDomain.EXERCISE,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("exercise_session_1", "Entrenamiento de fuerza", HealthAvailabilityStatus.AVAILABLE, "35 min")
+            ),
+            domain(
+                HealthDomain.SLEEP,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("sleep_session_1", "Sueño", HealthAvailabilityStatus.AVAILABLE, "5h 45m")
+            ),
+            domain(
+                HealthDomain.NUTRITION,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("nutrition_energy_total", "Energía total", HealthAvailabilityStatus.AVAILABLE, "1950 kcal"),
+                metric("nutrition_protein_total", "Proteína total", HealthAvailabilityStatus.AVAILABLE, "92 g")
+            )
+        )
+        val history = listOf(
+            sleepReport(LocalDate.of(2026, 8, 23), "7h 15m"),
+            sleepReport(LocalDate.of(2026, 8, 22), "7h 30m"),
+            sleepReport(LocalDate.of(2026, 8, 21), "7h 00m")
+        )
+
+        val review = NightlyReviewGenerator.generate(
+            report = yesterday,
+            generatedAt = Instant.parse("2026-08-25T07:00:00Z"),
+            recentReports = history
+        )
+
+        assertTrue(review.summary.contains("menos sueño", ignoreCase = true))
+        assertEquals(1, review.facts.size)
+        assertTrue(review.facts.single().contains("35 min"))
+        assertTrue(review.facts.single().contains("alimentación", ignoreCase = true))
+        assertFalse(review.renderPlainText().contains("source", ignoreCase = true))
+        assertFalse(review.renderPlainText().contains("com."))
+        assertEquals(1, review.nextActions.size)
+    }
+
+    @Test
+    fun `keeps absent nutrition as one quiet limitation instead of the main story`() {
+        val yesterday = sleepReport(LocalDate.of(2026, 8, 24), "7h 10m")
+
+        val review = NightlyReviewGenerator.generate(
+            report = yesterday,
+            generatedAt = Instant.parse("2026-08-25T07:00:00Z")
+        )
+
+        assertFalse(review.summary.contains("nutric", ignoreCase = true))
+        assertTrue(review.gaps.single().contains("alimentación", ignoreCase = true))
+        assertEquals(1, review.nextActions.size)
+    }
+
+    @Test
+    fun `uses longitudinal training load and a loaded check in to recommend recovery`() {
+        val date = LocalDate.of(2026, 8, 24)
+        val yesterday = report(
+            date,
+            domain(
+                HealthDomain.EXERCISE,
+                HealthAvailabilityStatus.AVAILABLE,
+                metric("exercise_session_1", "Fuerza", HealthAvailabilityStatus.AVAILABLE, "40 min")
+            )
+        )
+        val recent = (1L..7L).map { day ->
+            report(
+                date.minusDays(day),
+                domain(
+                    HealthDomain.EXERCISE,
+                    HealthAvailabilityStatus.AVAILABLE,
+                    metric("exercise_session_1", "Entrenamiento", HealthAvailabilityStatus.AVAILABLE, "40 min")
+                )
+            )
+        }
+        val earlier = (8L..28L).map { day -> report(date.minusDays(day)) }
+
+        val review = NightlyReviewGenerator.generate(
+            report = yesterday,
+            generatedAt = Instant.parse("2026-08-25T07:00:00Z"),
+            recentReports = recent + earlier,
+            feeling = NightlyFeeling.LOADED
+        )
+
+        assertTrue(review.summary.contains("carga", ignoreCase = true))
+        assertTrue(review.facts.single().contains("Últimos 7 días"))
+        assertTrue(review.nextActions.single().contains("yoga", ignoreCase = true))
+        assertTrue(review.checkInPrompt.contains("recuperación", ignoreCase = true))
+    }
+
     @Test
     fun `compares the recent seven days with the preceding twenty one when coverage is sufficient`() {
         val today = sleepReport(LocalDate.of(2026, 8, 24), "7h 25m")
@@ -114,7 +207,7 @@ class NightlyReviewGeneratorTest {
 
         assertTrue(review.summary.contains("sueño corto"))
         assertTrue(review.summary.contains("jornada sigue en curso"))
-        assertTrue(review.facts.any { it.contains("por debajo de siete horas") })
+        assertTrue(review.facts.any { it.contains("sueño corto") })
         assertTrue(review.gaps.any { it.contains("provisional") })
         assertTrue(review.gaps.any { it.contains("no una sesión") })
         assertFalse(review.renderPlainText().contains("Velocidad media"))
@@ -179,8 +272,9 @@ class NightlyReviewGeneratorTest {
         )
 
         assertTrue(review.facts.any { it.contains("Entrenamiento registrado") && it.contains("Entrenamiento de fuerza") })
-        assertTrue(review.facts.any { it.contains("menor recuperación") && it.contains("sin valor diagnóstico") })
-        assertTrue(review.nextActions.any { it.contains("próxima sesión") })
+        assertTrue(review.facts.any { it.contains("menor recuperación") })
+        assertFalse(review.renderPlainText().contains("diagnóstico"))
+        assertTrue(review.nextActions.any { it.contains("baja la intensidad") })
         assertFalse(review.renderPlainText().contains("debes"))
     }
 

@@ -4,8 +4,8 @@ import java.time.Duration
 import java.time.ZonedDateTime
 
 object NightlyReviewSchedule {
-    const val TARGET_HOUR = 22
-    const val TARGET_MINUTE = 30
+    const val TARGET_HOUR = 9
+    const val TARGET_MINUTE = 0
 
     fun delayUntilNextRun(now: ZonedDateTime): Duration {
         val todayTarget = now.toLocalDate()

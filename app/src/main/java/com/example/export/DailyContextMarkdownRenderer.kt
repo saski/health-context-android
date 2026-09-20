@@ -32,20 +32,17 @@ object DailyContextMarkdownRenderer {
         appendLine("- overall_status: ${report.overallStatus.name.lowercase()}")
         appendLine("- snapshot: daily Health Connect read; generated in foreground or scheduled background; not a live feed")
         appendLine()
-        appendLine("## Critical daily summary")
-        appendLine("- summary: ${review.summary}")
+        appendLine("## Morning coach review")
+        appendLine("- conclusion: ${review.summary}")
         appendLine()
-        appendLine("### Interpretation")
-        review.facts.ifEmpty { listOf("No reliable interpretation is available for this day.") }
-            .forEach { appendLine("- $it") }
+        appendLine("### Coach interpretation")
+        appendLine(review.facts.firstOrNull() ?: "No reliable interpretation is available for this day.")
         appendLine()
-        appendLine("### Evolution and confidence")
-        review.gaps.ifEmpty { listOf("No additional confidence limitation is present in this snapshot.") }
-            .forEach { appendLine("- $it") }
+        appendLine("### Recommendation for today")
+        appendLine(review.nextActions.firstOrNull() ?: "No change is suggested from this snapshot alone.")
         appendLine()
-        appendLine("### Suggestions")
-        review.nextActions.ifEmpty { listOf("No change is suggested from this snapshot alone.") }
-            .forEach { appendLine("- $it") }
+        appendLine("### Confidence note")
+        appendLine(review.gaps.firstOrNull() ?: "No additional confidence limitation is present in this snapshot.")
         report.domains.forEach { domain ->
             appendLine()
             appendLine("## ${domain.domain.labelEs}")

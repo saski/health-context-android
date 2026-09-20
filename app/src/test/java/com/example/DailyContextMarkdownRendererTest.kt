@@ -83,10 +83,10 @@ class DailyContextMarkdownRendererTest {
 
         assertTrue(DailyContextMarkdownRenderer.fileName(report) == "health-context-2026-08-18.md")
         assertTrue(markdown.contains("overall_status: partial"))
-        assertTrue(markdown.contains("## Critical daily summary"))
-        assertTrue(markdown.contains("### Interpretation"))
-        assertTrue(markdown.contains("### Evolution and confidence"))
-        assertTrue(markdown.contains("### Suggestions"))
+        assertTrue(markdown.contains("## Morning coach review"))
+        assertTrue(markdown.contains("### Coach interpretation"))
+        assertTrue(markdown.contains("### Recommendation for today"))
+        assertTrue(markdown.contains("### Confidence note"))
         assertTrue(markdown.contains("gap: unavailable; no value is inferred as zero"))
         assertFalse(markdown.contains("sleep: 0"))
     }
@@ -171,13 +171,12 @@ class DailyContextMarkdownRendererTest {
         val markdown = DailyContextMarkdownRenderer.render(report, Instant.parse("2026-08-21T13:31:54Z"))
         val retrievalPrefix = markdown.take(2_048)
 
-        assertTrue(retrievalPrefix.contains("## Critical daily summary"))
+        assertTrue(retrievalPrefix.contains("## Morning coach review"))
         assertTrue(
             retrievalPrefix.contains(
-                "Entrenamiento registrado: 1 sesión · 30 min en total. Detalle: Entrenamiento de fuerza · 30 min · " +
-                    "14:45 - 15:15 · origen: com.huami.watch.hmwatchmanager."
+                "Entrenamiento registrado: 1 sesión y 30 min en total (Entrenamiento de fuerza)."
             )
         )
-        assertTrue(markdown.indexOf("Entrenamiento registrado: Entrenamiento de fuerza") < markdown.indexOf("## Actividad diaria"))
+        assertTrue(retrievalPrefix.contains("source: com.huami.watch.hmwatchmanager"))
     }
 }

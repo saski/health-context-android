@@ -46,7 +46,7 @@ The first local build may not replace a build previously signed by Google AI
 Studio. If ADB reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, uninstall the old
 build once and install again. Uninstalling removes the app's local settings, so
 Health Connect permissions, the selected Drive folder, automatic export and the
-nightly review must be configured again. Daily Markdown files already stored in
+morning review must be configured again. Daily Markdown files already stored in
 Drive are not removed.
 
 After this one-time transition, Android Studio and CLI builds use the stable

@@ -1,10 +1,10 @@
 # Health Context Android
 
 `health-context-android` is the Android companion for the Health Context
-system. It reads a broad set of relevant Health Connect records and shows
-whether each daily domain is available. Its purpose is to make missing
-data visible before it is used in a health conversation; it is not a medical
-app or a cloud sync service.
+system. Its primary job is to turn Health Connect history into one useful
+morning coaching message: what yesterday and the recent trend mean, and what
+action is worth taking today. Detailed records remain available as supporting
+evidence. It is not a medical app or a cloud sync service.
 
 The companion repository,
 [`health-context-pipeline`](https://github.com/saski/health-context-pipeline),
@@ -32,8 +32,10 @@ remains an explicit gap rather than an error.
 
 ## Reading the dashboard
 
-The dashboard leads with the latest daily review: one supported conclusion and
-one suggested action. Daily domains follow below it. Each domain card shows up
+The dashboard leads with the latest daily review: one supported conclusion, a
+short longitudinal interpretation, one suggested action and one optional
+readiness check-in. Daily domains stay collapsed under **View supporting data**.
+Each domain card shows up
 to three observed metrics with their measured value and, when useful, their
 time or interval. Open **View details** to see the remaining observations,
 named gaps, and missing permissions.
@@ -106,48 +108,46 @@ picker; it has no OAuth credentials or broad Drive access.
    ChatGPT Health project. The app reports a local write only; it does not
    claim that the project has already read the file.
 
-## Nightly review experiment
+## Morning health coach
 
-The optional nightly review turns the daily snapshot into a small, local
-reflection loop. Enable it once after the Health context folder and background
-read access are configured. On Android 13 or later, also approve notifications.
+The optional morning review turns the daily snapshot and recent history into a
+small, local coaching loop. Enable it once after the Health context folder and
+background read access are configured. On Android 13 or later, also approve
+notifications.
 
-Around 22:30 local time, WorkManager reads the current day, writes a
-**provisional** snapshot, stores the review locally, and posts a low-priority
+Around 09:00 local time, WorkManager reads the previous day, writes its
+**final** snapshot, stores the review locally, and posts a low-priority
 notification. Android may delay the exact time. Every successful export writes
 both the dated archive `health-context-YYYY-MM-DD.md` and the stable
 `health-context-latest.md` entry point. Opening the notification shows:
 
 - one supported conclusion instead of a raw metric dump;
-- interpreted evidence against the previous seven days and, when coverage is
-  sufficient, evolution against the preceding twenty-one days;
-- confidence limits, never values inferred as zero;
-- at most two cautious suggestions for the next day;
-- a one-tap **Good**, **Loaded**, or **Unwell** feeling, also available from the
-  review screen and stored only on the phone;
+- a brief interpretation of yesterday's activity, training, sleep, recovery
+  and recorded nutrition in the context of the last 7/28 days;
+- one recommendation for today, such as keeping the plan, reducing intensity,
+  choosing yoga/mobility or a walk, or prioritizing recovery;
+- one contextual **Good**, **Loaded**, or **Unwell** check-in that recalculates
+  the recommendation locally and is stored only on the phone;
+- one quiet confidence note when missing data materially limits the judgement;
 - `useful` / `not useful` feedback stored only on the phone.
 
-The review is deterministic: it uses no AI, network service, diagnosis, or
-automatic training prescription. A personal comparison requires enough
-comparable observations in both periods. Workout count and total duration use
-reconciled exercise-session records and Health Connect's priority-aware daily
-duration when available; isolated speed, cadence, or power cannot create a
-workout. A recorded feeling is subjective context, never a clinical measurement.
+The review is deterministic: it uses no cloud AI, network service or diagnosis.
+It can reason about direction and consistency only when enough comparable days
+exist. Food advice remains qualitative unless personal goals and adequate
+recording coverage exist. Workout count and duration use reconciled
+exercise-session records and Health Connect's priority-aware duration when
+available; isolated speed, cadence, or power cannot create a workout. A recorded
+feeling is subjective context, never a clinical measurement.
 
-**Review now** runs the same path for initial verification or recovery; it is
-not intended as a daily requirement.
-Enabling the experiment also keeps the morning export enabled. The following
-morning the app silently recalculates yesterday, incorporates late source
-synchronization and the recorded feeling, and replaces both the dated file and
-`health-context-latest.md` with a **final** snapshot. It does not send a second
-notification. If Android missed scheduled work, the next run fills missing
-dated artifacts within the previous seven days and always finalizes yesterday,
-without duplicating dates. Pausing daily synchronization also pauses the nightly
-review because that self-correction is part of the experiment.
+**Update review** runs the same previous-day path for initial verification or
+recovery; it is not intended as a daily requirement. If Android missed
+scheduled work, the next run fills missing dated artifacts within the previous
+seven days and always finalizes yesterday without duplicating dates. Pausing
+daily synchronization also pauses the morning review because export and advice
+share one trustworthy data path.
 
-Run the experiment for seven nights before expanding it. Its first success
-criterion is simple: did the notification save a manual end-of-day review, and
-did its two actions help plan the next day?
+The practical success criterion is simple: does the morning message save manual
+interpretation, and does its single recommendation improve today's decision?
 
 An unavailable domain can simply mean that the relevant device was not worn,
 has not synchronized, or that no manual entry was made. It is not a diagnosis.

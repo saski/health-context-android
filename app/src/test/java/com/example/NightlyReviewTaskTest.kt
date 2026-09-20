@@ -22,7 +22,7 @@ import java.time.ZoneId
 
 class NightlyReviewTaskTest {
     @Test
-    fun `reads today persists the artifact and only then notifies`() = runTest {
+    fun `reads yesterday finalizes the artifact and only then notifies`() = runTest {
         val zone = ZoneId.of("Europe/Madrid")
         val clock = Clock.fixed(Instant.parse("2026-08-20T20:30:00Z"), zone)
         val events = mutableListOf<String>()
@@ -34,10 +34,10 @@ class NightlyReviewTaskTest {
         val result = NightlyReviewTask(health, writer, store, notifier, clock, zone).run()
 
         assertTrue(result.isSuccess)
-        assertEquals(LocalDate.of(2026, 8, 20), health.requestedDates.first())
+        assertEquals(LocalDate.of(2026, 8, 19), health.requestedDates.first())
         assertEquals(29, health.requestedDates.size)
         assertEquals(listOf("export", "save", "notify"), events)
-        assertEquals("health-context-2026-08-20.md", result.getOrNull())
+        assertEquals("health-context-2026-08-19.md", result.getOrNull())
     }
 
     @Test
@@ -93,7 +93,7 @@ class NightlyReviewTaskTest {
             stage: SnapshotStage
         ): Result<String> {
             events += "export"
-            assertEquals(SnapshotStage.PROVISIONAL, stage)
+            assertEquals(SnapshotStage.FINAL, stage)
             return Result.success("health-context-${report.date}.md")
         }
     }

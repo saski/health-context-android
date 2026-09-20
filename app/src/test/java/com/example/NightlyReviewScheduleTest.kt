@@ -11,15 +11,15 @@ class NightlyReviewScheduleTest {
     private val madrid = ZoneId.of("Europe/Madrid")
 
     @Test
-    fun `schedules the same night before the target time`() {
-        val now = ZonedDateTime.of(2026, 8, 20, 21, 45, 0, 0, madrid)
+    fun `schedules the same morning before nine`() {
+        val now = ZonedDateTime.of(2026, 8, 20, 8, 15, 0, 0, madrid)
 
         assertEquals(Duration.ofMinutes(45), NightlyReviewSchedule.delayUntilNextRun(now))
     }
 
     @Test
-    fun `schedules the next night after the target time`() {
-        val now = ZonedDateTime.of(2026, 8, 20, 23, 0, 0, 0, madrid)
+    fun `schedules the next morning after nine`() {
+        val now = ZonedDateTime.of(2026, 8, 20, 9, 30, 0, 0, madrid)
 
         assertEquals(Duration.ofHours(23).plusMinutes(30), NightlyReviewSchedule.delayUntilNextRun(now))
     }

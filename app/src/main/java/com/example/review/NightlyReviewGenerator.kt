@@ -9,6 +9,7 @@ import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/** Builds one concise, local coaching message from daily evidence and recent personal context. */
 object NightlyReviewGenerator {
     private const val MINIMUM_BASELINE_DAYS = 3
     private const val RECENT_WINDOW_DAYS = 7
@@ -29,80 +30,91 @@ object NightlyReviewGenerator {
             .take(HISTORY_WINDOW_DAYS)
         val current = SnapshotStats.from(report)
         val baselines = PersonalBaselines.from(history.take(RECENT_WINDOW_DAYS))
-        val evolution = RecentEvolution.from(history)
+        val trends = RecentEvolution.from(history)
         val localGeneratedAt = generatedAt.atZone(report.zoneId)
         val currentDay = localGeneratedAt.toLocalDate() == report.date
         val dayInProgress = currentDay && localGeneratedAt.hour < EVENING_HOUR
-
         val signals = Signals.from(current, baselines)
-        val facts = interpretedFacts(current, baselines, signals, dayInProgress, feeling) + evolution.facts
-        val limits = interpretationLimits(report, current, baselines, currentDay, dayInProgress)
-        val actions = suggestedActions(current, signals, feeling).take(2)
 
         return NightlyReview(
             date = report.date,
             generatedAt = generatedAt,
-            summary = summary(current, signals, currentDay, dayInProgress, feeling),
-            facts = facts,
-            gaps = limits,
-            nextActions = actions
+            summary = summary(current, signals, trends, currentDay, dayInProgress, feeling),
+            facts = listOf(coachingMessage(current, baselines, signals, trends, feeling)),
+            gaps = confidenceNote(current, baselines, currentDay, dayInProgress),
+            nextActions = listOf(primaryAction(current, signals, trends, feeling)),
+            checkInPrompt = checkInPrompt(current, signals, trends)
         )
     }
 
     private fun summary(
         current: SnapshotStats,
         signals: Signals,
+        trends: RecentEvolution,
         currentDay: Boolean,
         dayInProgress: Boolean,
         feeling: NightlyFeeling?
     ): String {
         val provisional = when {
-            dayInProgress -> " La jornada sigue en curso: actividad y nutrición aún son provisionales."
-            currentDay -> " Es una lectura provisional que se recalculará mañana con datos tardíos."
+            dayInProgress -> " La jornada sigue en curso, así que esta lectura todavía es provisional."
+            currentDay -> " Esta lectura se completará mañana con los datos que lleguen tarde."
             else -> ""
         }
+        val hasWorkout = current.exerciseSessions.isNotEmpty()
         return when {
             feeling == NightlyFeeling.UNWELL ->
-                "Has registrado que te encuentras mal; los datos sirven como contexto, no como diagnóstico.$provisional"
+                "Has indicado que hoy te encuentras mal; manda cómo te sientes, no el plan.$provisional"
+            feeling == NightlyFeeling.LOADED && trends.trainingLoadHigher ->
+                "La carga de las últimas semanas está subiendo y hoy sigues notándola.$provisional"
+            signals.sleepBelowBaseline && hasWorkout ->
+                "Ayer entrenaste con menos sueño de lo habitual, por debajo de tu referencia reciente.$provisional"
             signals.sleepBelowBaseline ->
-                "La señal principal es un sueño por debajo de tu referencia reciente.$provisional"
+                "Ayer el descanso quedó por debajo de tu referencia reciente.$provisional"
+            signals.shortSleep && hasWorkout ->
+                "Ayer hubo entrenamiento, pero el sueño fue corto para acompañar bien la recuperación.$provisional"
             signals.shortSleep ->
-                "La señal principal es un sueño corto, sin historial suficiente para afirmar una evolución.$provisional"
+                "La señal principal es un sueño corto.$provisional"
+            signals.recoveryLessFavourable && hasWorkout ->
+                "Ayer sumaste entrenamiento con señales de recuperación menos favorables de lo habitual.$provisional"
             signals.recoveryLessFavourable ->
-                "Las señales de recuperación se apartan de tu referencia reciente en una dirección menos favorable.$provisional"
+                "Ayer las señales de recuperación fueron menos favorables que tu referencia reciente.$provisional"
             feeling == NightlyFeeling.LOADED ->
-                "Has registrado una sensación de carga; conviene decidir mañana según cómo evolucione.$provisional"
-            current.exerciseSessions.isNotEmpty() ->
-                "Hay un entrenamiento real registrado; no aparece otra señal suficientemente sólida para cambiar el plan.$provisional"
+                "Hoy te notas cargado; conviene ajustar el plan a tus sensaciones.$provisional"
+            hasWorkout ->
+                "Ayer entrenaste y no aparece otra señal sólida que obligue a cambiar el plan de hoy.$provisional"
             dayInProgress ->
-                "La jornada sigue en curso y todavía no ofrece una señal suficientemente completa para valorarla."
+                "La jornada sigue en curso y aún no hay evidencia suficiente para valorarla."
+            trends.activityLower ->
+                "Tu actividad reciente ha bajado, aunque un día tranquilo no necesita compensación.$provisional"
             else ->
-                "No aparece una desviación suficientemente sólida para cambiar el plan a partir de esta revisión."
+                "Ayer no aparece ninguna señal sólida que obligue a cambiar el plan de hoy.$provisional"
         }.trim()
     }
 
-    private fun interpretedFacts(
+    private fun coachingMessage(
         current: SnapshotStats,
         baselines: PersonalBaselines,
         signals: Signals,
-        dayInProgress: Boolean,
+        trends: RecentEvolution,
         feeling: NightlyFeeling?
-    ): List<String> = buildList {
-        feeling?.let { add("Sensación registrada: te sentías ${it.labelEs}; se usa como contexto subjetivo, no como medida clínica.") }
+    ): String = buildList {
+        feeling?.let { add("Tu sensación registrada fue ${it.labelEs}; la uso para matizar la recomendación.") }
+
         current.sleepMinutes?.let { sleep ->
             val baseline = baselines.sleepMinutes
             when {
                 signals.sleepBelowBaseline && baseline != null -> {
                     val difference = baseline.value.roundToInt() - sleep
                     add(
-                        "Sueño: ${formatMinutes(sleep)} son ${formatMinutes(difference)} menos que tu " +
-                            "referencia reciente (${formatMinutes(baseline.value.roundToInt())})."
+                        "Dormiste ${formatMinutes(sleep)}, ${formatMinutes(difference)} menos que tu " +
+                            "referencia reciente de ${formatMinutes(baseline.value.roundToInt())}."
                     )
                 }
                 sleep < SEVEN_HOURS_IN_MINUTES ->
-                    add("Sueño: ${formatMinutes(sleep)} queda por debajo de siete horas; un solo día no define una evolución.")
+                    add("Dormiste ${formatMinutes(sleep)}; es un sueño corto, aunque un solo día no define tu evolución.")
                 baseline != null && abs(sleep - baseline.value) <= 45 ->
-                    add("Sueño: ${formatMinutes(sleep)} se mantiene cerca de tu referencia reciente.")
+                    add("Dormiste ${formatMinutes(sleep)}, cerca de tu referencia reciente.")
+                else -> add("El sueño registrado fue de ${formatMinutes(sleep)}.")
             }
         }
 
@@ -112,103 +124,115 @@ object NightlyReviewGenerator {
                 current.hrvRmssd?.let { ((it - baseline.value) / baseline.value * 100.0).roundToInt() }
             }
             val changes = buildList {
-                restingDelta?.takeIf { it >= 5.0 }?.let { add("FC en reposo +${it.roundToInt()} ppm") }
-                hrvDeltaPercent?.takeIf { it <= -15 }?.let { add("HRV ${abs(it)} % menor") }
+                restingDelta?.takeIf { it >= 5.0 }?.let { add("FC en reposo ${it.roundToInt()} ppm más alta") }
+                hrvDeltaPercent?.takeIf { it <= -15 }?.let { add("variabilidad cardíaca ${abs(it)} % menor") }
             }.joinToString(" y ")
-            add(
-                "Recuperación: $changes frente a tu referencia reciente apuntan a menor recuperación; " +
-                    "es una señal personal orientativa, sin valor diagnóstico."
-            )
+            add("La $changes apunta a menor recuperación frente a tu propia referencia.")
         }
 
         if (current.exerciseSessions.isNotEmpty()) {
-            val sessions = current.exerciseSessions.joinToString("; ") { session ->
-                buildString {
-                    append(session.label)
-                    session.observation?.let { append(" · $it") }
-                    if (session.coveredThrough != "Total del día") append(" · ${session.coveredThrough}")
-                    append(" · origen: ${session.source}")
-                }
-            }
-            val sessionLabel = if (current.exerciseSessions.size == 1) "1 sesión" else "${current.exerciseSessions.size} sesiones"
-            val duration = current.trainingMinutes?.let { " · ${formatMinutes(it)} en total" }.orEmpty()
-            add("Entrenamiento registrado: $sessionLabel$duration. Detalle: $sessions.")
-        }
-
-        if (!dayInProgress && current.steps != null && baselines.steps != null) {
+            val count = current.exerciseSessions.size
+            val sessionLabel = if (count == 1) "1 sesión" else "$count sesiones"
+            val duration = current.trainingMinutes?.let { " y ${formatMinutes(it)} en total" }.orEmpty()
+            val types = current.exerciseSessions.map { it.label }.distinct().take(2).joinToString(" y ")
+            add("Entrenamiento registrado: $sessionLabel$duration${types.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()}.")
+        } else if (current.steps != null && baselines.steps != null) {
             val ratio = current.steps / baselines.steps.value
-            when {
-                ratio < 0.7 -> add("Actividad: el movimiento del día queda claramente por debajo de tu referencia reciente.")
-                ratio > 1.3 -> add("Actividad: el movimiento del día queda claramente por encima de tu referencia reciente.")
-                else -> add("Actividad: el movimiento del día está cerca de tu referencia reciente.")
-            }
+            add(
+                when {
+                    ratio < 0.7 -> "Tu movimiento quedó claramente por debajo de tu referencia reciente."
+                    ratio > 1.3 -> "Tu movimiento quedó claramente por encima de tu referencia reciente."
+                    else -> "Tu movimiento se mantuvo cerca de tu referencia reciente."
+                }
+            )
         }
-    }
 
-    private fun interpretationLimits(
-        report: DayAvailabilityReport,
+        if (current.nutritionObserved) {
+            val nutritionDetails = buildList {
+                current.nutritionEnergy?.let { add("${formatWhole(it)} kcal") }
+                current.nutritionProtein?.let { add("${formatWhole(it)} g de proteína") }
+            }
+            add(
+                if (nutritionDetails.isEmpty()) {
+                    "Hay alimentación registrada, pero no suficiente detalle para valorar el conjunto del día."
+                } else {
+                    "La alimentación quedó registrada (${nutritionDetails.joinToString(" y ")}); la tomo como contexto, no como un objetivo personal."
+                }
+            )
+        }
+
+        trends.primaryFact?.let(::add)
+    }.ifEmpty {
+        listOf("Los datos disponibles no permiten una lectura responsable más allá de confirmar que no hay una señal clara.")
+    }.joinToString(" ")
+
+    private fun confidenceNote(
         current: SnapshotStats,
         baselines: PersonalBaselines,
         currentDay: Boolean,
         dayInProgress: Boolean
-    ): List<String> = buildList {
-        if (currentDay) {
-            add(
-                if (dayInProgress) {
-                    "Lectura provisional: no se juzgan actividad ni nutrición antes de que termine el día."
-                } else {
-                    "Lectura provisional: la exportación de mañana incorporará registros que lleguen tarde."
-                }
-            )
+    ): List<String> {
+        val limits = buildList {
+            if (currentDay) {
+                add(
+                    if (dayInProgress) {
+                        "Es una lectura provisional del día en curso."
+                    } else {
+                        "Los registros tardíos se incorporarán en la revisión de mañana."
+                    }
+                )
+            }
+            if (!baselines.hasAnyReadyBaseline()) {
+                add("Hacen falta al menos 3 días comparables para hablar de evolución personal.")
+            }
+            if (current.sleepMinutes == null) add("No hay sueño utilizable.")
+            if (current.exerciseSessions.isEmpty() && current.hasIsolatedExerciseMetrics) {
+                add("Hay métricas de movimiento, pero no una sesión de entrenamiento confirmada.")
+            }
+            if (!current.nutritionObserved) {
+                add("No hay un registro utilizable de alimentación; no se interpreta como ingesta cero.")
+            }
         }
-
-        if (!baselines.hasAnyReadyBaseline()) {
-            add("Evolución: hacen falta al menos 3 días comparables dentro de los 7 anteriores para afirmar cambios.")
-        }
-
-        if (current.sleepMinutes == null || (current.restingHeartRate == null && current.hrvRmssd == null)) {
-            val missing = buildList {
-                if (current.sleepMinutes == null) add("sueño")
-                if (current.restingHeartRate == null && current.hrvRmssd == null) add("recuperación")
-            }.joinToString(" y ")
-            add("Confianza limitada: hoy falta contexto de $missing; ausencia de datos no equivale a un resultado negativo.")
-        }
-
-        if (current.exerciseSessions.isEmpty() && current.hasIsolatedExerciseMetrics) {
-            add("Entrenamiento: Health Connect aporta métricas sueltas, pero no una sesión; no se cuentan como entrenamiento.")
-        }
-
-        val nutrition = report.domain(HealthDomain.NUTRITION)
-        if (!dayInProgress && nutrition?.hasObservedData() != true) {
-            add("Nutrición no evaluable: no hay registro; esto limita la revisión, pero no se interpreta como ingesta cero.")
-        }
+        return limits.takeIf { it.isNotEmpty() }
+            ?.let { listOf(it.joinToString(" ")) }
+            .orEmpty()
     }
 
-    private fun suggestedActions(
+    private fun primaryAction(
         current: SnapshotStats,
         signals: Signals,
+        trends: RecentEvolution,
         feeling: NightlyFeeling?
-    ): List<String> = buildList {
-        if (feeling == NightlyFeeling.UNWELL) {
-            add("Prioriza descanso y reevalúa mañana; si el malestar es importante o persiste, busca orientación profesional.")
-        } else if (feeling == NightlyFeeling.LOADED) {
-            add("Valora una sesión fácil o descanso mañana y comprueba si la sensación de carga mejora.")
-        }
-        if (signals.shortSleep || signals.sleepBelowBaseline) {
-            add("Protege esta noche una ventana de sueño más amplia y comprueba mañana si la señal se corrige.")
-        }
+    ): String = when {
+        feeling == NightlyFeeling.UNWELL ->
+            "Hoy prioriza descanso y reevalúa cómo te encuentras; si el malestar es importante o persiste, consulta a un profesional."
+        feeling == NightlyFeeling.LOADED && trends.trainingLoadHigher ->
+            "Cambia hoy la sesión intensa por yoga, movilidad, un paseo suave o descanso, y vuelve a valorar mañana."
+        feeling == NightlyFeeling.LOADED ->
+            "Hoy elige yoga, movilidad, un paseo suave o descanso y comprueba si la sensación de carga mejora."
+        (signals.sleepBelowBaseline || signals.shortSleep || signals.recoveryLessFavourable) &&
+            current.exerciseSessions.isNotEmpty() ->
+            "Hoy prioriza recuperación: baja la intensidad o elige yoga, movilidad o paseo suave, come con regularidad y protege una ventana de sueño más amplia."
+        signals.sleepBelowBaseline || signals.shortSleep ->
+            "Hoy mantén un movimiento suave y protege una ventana de sueño más amplia esta noche."
+        signals.recoveryLessFavourable ->
+            "Hoy ajusta la intensidad a tus sensaciones y favorece recuperación con comidas regulares, hidratación y descanso."
+        trends.activityLower ->
+            "Si hoy te encuentras bien, recupera movimiento sin compensar: un paseo o una sesión suave es suficiente."
+        current.exerciseSessions.isNotEmpty() ->
+            "Mantén el plan previsto y facilita la recuperación con comidas regulares, hidratación y una buena oportunidad de sueño."
+        else ->
+            "Mantén el plan previsto; hoy no hay una señal suficientemente sólida para cambiarlo."
+    }
 
-        when {
-            signals.recoveryLessFavourable && current.exerciseSessions.isNotEmpty() ->
-                add("Haz que la próxima sesión sea fácil o descansa si tus sensaciones coinciden con estas señales.")
-            current.exerciseSessions.isNotEmpty() &&
-                (current.sleepMinutes == null || (current.restingHeartRate == null && current.hrvRmssd == null)) ->
-                add("Decide la intensidad de la próxima sesión según tus sensaciones; hoy faltan datos para orientarla.")
-        }
-
-        if (isEmpty()) {
-            add("Mantén el plan previsto; hoy no aparece una señal suficientemente sólida para cambiarlo.")
-        }
+    private fun checkInPrompt(
+        current: SnapshotStats,
+        signals: Signals,
+        trends: RecentEvolution
+    ): String = when {
+        current.exerciseSessions.isNotEmpty() || trends.trainingLoadHigher -> "¿Cómo notas hoy la recuperación?"
+        signals.shortSleep || signals.sleepBelowBaseline -> "¿Con qué energía te has levantado?"
+        else -> "¿Cómo te encuentras hoy?"
     }
 
     private data class Signals(
@@ -221,11 +245,11 @@ object NightlyReviewGenerator {
                 val sleepBelowBaseline = current.sleepMinutes?.let { sleep ->
                     baselines.sleepMinutes?.let { sleep <= it.value - 45.0 }
                 } ?: false
-                val restingElevated = current.restingHeartRate?.let { currentValue ->
-                    baselines.restingHeartRate?.let { currentValue >= it.value + 5.0 }
+                val restingElevated = current.restingHeartRate?.let { value ->
+                    baselines.restingHeartRate?.let { value >= it.value + 5.0 }
                 } ?: false
-                val hrvLower = current.hrvRmssd?.let { currentValue ->
-                    baselines.hrvRmssd?.let { currentValue <= it.value * 0.85 }
+                val hrvLower = current.hrvRmssd?.let { value ->
+                    baselines.hrvRmssd?.let { value <= it.value * 0.85 }
                 } ?: false
                 return Signals(
                     shortSleep = current.sleepMinutes?.let { it < SEVEN_HOURS_IN_MINUTES } == true,
@@ -236,7 +260,7 @@ object NightlyReviewGenerator {
         }
     }
 
-    private data class Baseline(val value: Double, val observations: Int)
+    private data class Baseline(val value: Double)
 
     private data class PersonalBaselines(
         val sleepMinutes: Baseline?,
@@ -259,94 +283,73 @@ object NightlyReviewGenerator {
 
             private fun baseline(values: List<Double>): Baseline? {
                 if (values.size < MINIMUM_BASELINE_DAYS) return null
-                val sorted = values.sorted()
-                val middle = sorted.size / 2
-                val median = if (sorted.size % 2 == 0) {
-                    (sorted[middle - 1] + sorted[middle]) / 2.0
-                } else {
-                    sorted[middle]
-                }
-                return Baseline(median, values.size)
+                return Baseline(median(values))
             }
         }
     }
 
-    private data class RecentEvolution(val facts: List<String>) {
+    private data class RecentEvolution(
+        val primaryFact: String?,
+        val trainingLoadHigher: Boolean,
+        val activityLower: Boolean
+    ) {
         companion object {
             fun from(history: List<DayAvailabilityReport>): RecentEvolution {
                 val recent = history.take(RECENT_WINDOW_DAYS).map(SnapshotStats::from)
                 val earlier = history.drop(RECENT_WINDOW_DAYS).take(21).map(SnapshotStats::from)
-                return RecentEvolution(buildList {
-                    comparableMedian(recent.mapNotNull { it.sleepMinutes?.toDouble() }, earlier.mapNotNull { it.sleepMinutes?.toDouble() })
-                        ?.let { (recentValue, earlierValue) ->
-                            val difference = (recentValue - earlierValue).roundToInt()
-                            if (abs(difference) >= 30) {
-                                val direction = if (difference > 0) "más" else "menos"
-                                add("Últimos 7 días: el sueño mediano es ${formatMinutes(abs(difference))} $direction que en los 21 días anteriores.")
-                            }
-                        }
-                    comparableMedian(recent.mapNotNull { it.steps }, earlier.mapNotNull { it.steps })
-                        ?.let { (recentValue, earlierValue) ->
-                            if (earlierValue > 0) {
-                                val percent = ((recentValue - earlierValue) / earlierValue * 100).roundToInt()
-                                if (abs(percent) >= 20) {
-                                    val direction = if (percent > 0) "por encima" else "por debajo"
-                                    add("Últimos 7 días: la actividad mediana está ${abs(percent)} % $direction de los 21 días anteriores.")
-                                }
-                            }
-                        }
-                    comparableMedian(
-                        recent.mapNotNull { it.restingHeartRate },
-                        earlier.mapNotNull { it.restingHeartRate }
-                    )?.let { (recentValue, earlierValue) ->
-                        val difference = recentValue - earlierValue
-                        if (abs(difference) >= 3) {
-                            val direction = if (difference > 0) "más alta" else "más baja"
-                            add("Últimos 7 días: la FC en reposo mediana está ${abs(difference).roundToInt()} ppm $direction que en los 21 días anteriores.")
-                        }
+
+                val recentTraining = recent.sumOf { it.trainingMinutes ?: 0 }
+                val earlierWeeklyTraining = if (earlier.isEmpty()) {
+                    0.0
+                } else {
+                    earlier.sumOf { it.trainingMinutes ?: 0 } * 7.0 / earlier.size
+                }
+                val trainingLoadHigher = recent.size >= MINIMUM_BASELINE_DAYS &&
+                    earlier.size >= MINIMUM_EARLIER_DAYS && recentTraining >= 60 &&
+                    recentTraining >= earlierWeeklyTraining * 1.3
+
+                val stepComparison = comparableMedian(
+                    recent.mapNotNull { it.steps },
+                    earlier.mapNotNull { it.steps }
+                )
+                val activityLower = stepComparison?.let { (recentValue, earlierValue) ->
+                    earlierValue > 0 && recentValue <= earlierValue * 0.8
+                } == true
+
+                val facts = buildList {
+                    if (trainingLoadHigher) {
+                        add("Últimos 7 días: la carga de entrenamiento ha subido frente a las tres semanas anteriores.")
                     }
-                    comparableMedian(recent.mapNotNull { it.hrvRmssd }, earlier.mapNotNull { it.hrvRmssd })
-                        ?.let { (recentValue, earlierValue) ->
-                            if (earlierValue > 0) {
-                                val percent = ((recentValue - earlierValue) / earlierValue * 100).roundToInt()
-                                if (abs(percent) >= 10) {
-                                    val direction = if (percent > 0) "mayor" else "menor"
-                                    add("Últimos 7 días: la HRV mediana es ${abs(percent)} % $direction que en los 21 días anteriores.")
-                                }
-                            }
-                        }
                     comparableMedian(
-                        recent.mapNotNull { it.trainingMinutes?.toDouble() },
-                        earlier.mapNotNull { it.trainingMinutes?.toDouble() }
+                        recent.mapNotNull { it.sleepMinutes?.toDouble() },
+                        earlier.mapNotNull { it.sleepMinutes?.toDouble() }
                     )?.let { (recentValue, earlierValue) ->
                         val difference = (recentValue - earlierValue).roundToInt()
-                        if (abs(difference) >= 10) {
+                        if (abs(difference) >= 30) {
                             val direction = if (difference > 0) "más" else "menos"
-                            add(
-                                "Últimos 7 días: entre los entrenamientos registrados, la duración mediana es " +
-                                    "${formatMinutes(abs(difference))} $direction que en los 21 días anteriores."
-                            )
+                            add("Últimos 7 días: el sueño mediano es ${formatMinutes(abs(difference))} $direction que en los 21 anteriores.")
                         }
                     }
-                })
+                    stepComparison?.let { (recentValue, earlierValue) ->
+                        if (earlierValue > 0) {
+                            val percent = ((recentValue - earlierValue) / earlierValue * 100).roundToInt()
+                            if (abs(percent) >= 20) {
+                                val direction = if (percent > 0) "por encima" else "por debajo"
+                                add("Últimos 7 días: la actividad mediana está ${abs(percent)} % $direction de los 21 anteriores.")
+                            }
+                        }
+                    }
+                    val nutritionDays = recent.count { it.nutritionObserved }
+                    if (recent.size >= 5 && nutritionDays in 1..4) {
+                        add("La alimentación está registrada en $nutritionDays de los últimos ${recent.size} días; la tendencia nutricional aún es incompleta.")
+                    }
+                }
+                return RecentEvolution(facts.firstOrNull(), trainingLoadHigher, activityLower)
             }
 
-            private fun comparableMedian(
-                recent: List<Double>,
-                earlier: List<Double>
-            ): Pair<Double, Double>? {
+            private fun comparableMedian(recent: List<Double>, earlier: List<Double>): Pair<Double, Double>? {
                 if (recent.size < MINIMUM_BASELINE_DAYS || earlier.size < MINIMUM_EARLIER_DAYS) return null
                 return median(recent) to median(earlier)
-            }
-
-            private fun median(values: List<Double>): Double {
-                val sorted = values.sorted()
-                val middle = sorted.size / 2
-                return if (sorted.size % 2 == 0) {
-                    (sorted[middle - 1] + sorted[middle]) / 2.0
-                } else {
-                    sorted[middle]
-                }
             }
         }
     }
@@ -358,7 +361,10 @@ object NightlyReviewGenerator {
         val hrvRmssd: Double?,
         val exerciseSessions: List<MetricAvailability>,
         val trainingMinutes: Int?,
-        val hasIsolatedExerciseMetrics: Boolean
+        val hasIsolatedExerciseMetrics: Boolean,
+        val nutritionObserved: Boolean,
+        val nutritionEnergy: Double?,
+        val nutritionProtein: Double?
     ) {
         companion object {
             fun from(report: DayAvailabilityReport): SnapshotStats {
@@ -366,13 +372,14 @@ object NightlyReviewGenerator {
                     ?.metrics
                     .orEmpty()
                     .filter { it.status == HealthAvailabilityStatus.AVAILABLE && !it.observation.isNullOrBlank() }
+                val nutrition = report.domain(HealthDomain.NUTRITION)
                 return SnapshotStats(
                     steps = report.availableMetric(HealthDomain.STEPS, "steps")?.number(),
                     sleepMinutes = report.domain(HealthDomain.SLEEP)
                         ?.metrics
                         .orEmpty()
                         .filter { it.status == HealthAvailabilityStatus.AVAILABLE && it.key.startsWith("sleep_session_") }
-                        .mapNotNull { it.observation?.sleepMinutes() }
+                        .mapNotNull { it.observation?.durationMinutes() }
                         .takeIf { it.isNotEmpty() }
                         ?.sum(),
                     restingHeartRate = report.availableMetric(
@@ -384,13 +391,22 @@ object NightlyReviewGenerator {
                     trainingMinutes = report.availableMetric(
                         HealthDomain.EXERCISE,
                         "exercise_duration_total"
-                    )?.observation?.sleepMinutes()
+                    )?.observation?.durationMinutes()
                         ?: exerciseMetrics
                             .filter { it.key.startsWith("exercise_session_") }
-                            .mapNotNull { it.observation?.sleepMinutes() }
+                            .mapNotNull { it.observation?.durationMinutes() }
                             .takeIf { it.isNotEmpty() }
                             ?.sum(),
-                    hasIsolatedExerciseMetrics = exerciseMetrics.any { !it.key.startsWith("exercise_session_") }
+                    hasIsolatedExerciseMetrics = exerciseMetrics.any { !it.key.startsWith("exercise_session_") },
+                    nutritionObserved = nutrition?.hasObservedData() == true,
+                    nutritionEnergy = report.availableMetric(
+                        HealthDomain.NUTRITION,
+                        "nutrition_energy_total"
+                    )?.number(),
+                    nutritionProtein = report.availableMetric(
+                        HealthDomain.NUTRITION,
+                        "nutrition_protein_total"
+                    )?.number()
                 )
             }
         }
@@ -420,7 +436,7 @@ object NightlyReviewGenerator {
         return normalized.toDoubleOrNull()
     }
 
-    private fun String.sleepMinutes(): Int? {
+    private fun String.durationMinutes(): Int? {
         val match = Regex("""(?:(\d+)\s*h)?\s*(\d+)\s*m""").find(this) ?: return null
         val hours = match.groupValues[1].toIntOrNull() ?: 0
         val minutes = match.groupValues[2].toIntOrNull() ?: 0
@@ -435,6 +451,19 @@ object NightlyReviewGenerator {
             hours > 0 && minutes > 0 -> "$hours h $minutes min"
             hours > 0 -> "$hours h"
             else -> "$minutes min"
+        }
+    }
+
+    private fun formatWhole(value: Double): String =
+        if (value % 1.0 == 0.0) value.roundToInt().toString() else String.format("%.1f", value)
+
+    private fun median(values: List<Double>): Double {
+        val sorted = values.sorted()
+        val middle = sorted.size / 2
+        return if (sorted.size % 2 == 0) {
+            (sorted[middle - 1] + sorted[middle]) / 2.0
+        } else {
+            sorted[middle]
         }
     }
 }

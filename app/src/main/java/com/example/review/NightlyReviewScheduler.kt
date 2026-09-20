@@ -1,25 +1,15 @@
 package com.example.review
 
 import android.content.Context
-import androidx.work.BackoffPolicy
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.time.ZonedDateTime
-import java.util.concurrent.TimeUnit
 
 class NightlyReviewScheduler(private val context: Context) {
+    @Suppress("UNUSED_PARAMETER")
     fun enable(now: ZonedDateTime = ZonedDateTime.now()) {
-        val delay = NightlyReviewSchedule.delayUntilNextRun(now)
-        val periodic = PeriodicWorkRequestBuilder<NightlyReviewWorker>(24, TimeUnit.HOURS)
-            .setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
-            .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            periodic
-        )
+        // The 09:00 DailyHealthExportWorker owns both final export and notification.
+        // Cancel the old 22:30 work when upgrading an existing installation.
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
     fun disable() {

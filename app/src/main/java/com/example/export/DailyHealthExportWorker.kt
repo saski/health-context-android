@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.repository.RealHealthConnectRepository
+import com.example.review.AndroidNightlyReviewNotifier
+import com.example.review.NightlyReviewTask
 import com.example.review.SharedPreferencesNightlyReviewStore
 import java.time.Clock
 import java.time.LocalDate
@@ -43,9 +45,23 @@ class DailyHealthExportWorker(
         val export = runCatching {
             val today = LocalDate.now(clock.withZone(zoneId))
             val archiveDates = writer.existingArchiveDates().getOrThrow()
-            ExportRecoveryPolicy.datesToExport(today, archiveDates)
-                .map { date -> exportTask.run(date).getOrThrow() }
-                .last()
+            val dates = ExportRecoveryPolicy.datesToExport(today, archiveDates)
+            dates.dropLast(1).forEach { date -> exportTask.run(date).getOrThrow() }
+            val fileName = if (reviewStore.isEnabled()) {
+                val reviewedFile = NightlyReviewTask(
+                    healthRepository = healthRepository,
+                    writer = writer,
+                    store = reviewStore,
+                    notifier = AndroidNightlyReviewNotifier(applicationContext),
+                    clock = clock,
+                    zoneId = zoneId
+                ).run().getOrThrow()
+                reviewStore.recordStatus("Revisión de ayer enviada alrededor de las 09:00")
+                reviewedFile
+            } else {
+                exportTask.run(dates.last()).getOrThrow()
+            }
+            fileName
         }
 
         return export.fold(
@@ -54,6 +70,11 @@ class DailyHealthExportWorker(
                 Result.success()
             },
             onFailure = { error ->
+                if (reviewStore.isEnabled()) {
+                    reviewStore.recordStatus(
+                        "La revisión diaria falló: ${error.localizedMessage ?: "error desconocido"}"
+                    )
+                }
                 writer.recordAutomaticExportStatus(
                     "Última exportación automática falló: ${error.localizedMessage ?: "error desconocido"}"
                 )
